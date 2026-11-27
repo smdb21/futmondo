@@ -319,7 +319,11 @@ function(input, output, session) {
   })
   is_admin_RV <- reactive(is_authorized_admin(login_token_RV()))
   page_preferences <- fm_page_preferences(session, login_token_RV, reactive(input$tabs), is_admin_RV)
-  destination_pages <- reactive(fm_navigation_pages(is_admin_RV()))
+  destination_pages <- reactive({
+    pages <- fm_navigation_pages(is_admin_RV())
+    first <- c("lineup", "yourteam", "today")
+    pages[match(c(first, setdiff(pages$tab, first)), pages$tab), , drop = FALSE]
+  })
   output$home_destinations <- renderUI({
     req(valid_login(login_token_RV()))
     pages <- destination_pages()

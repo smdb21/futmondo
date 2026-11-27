@@ -1,6 +1,6 @@
 # Home and saved pages
 
-Both password login and remembered login open Home. The dashboard tab `login` presents Welcome to visitors and Home to signed-in users. Home shows the active league selector, team, round, balance and squad size. It links directly to the main pages. Account settings contains display timezone, factual sync preferences and logout. The page controls adapt to the screen size and the Home control remains reachable with the sidebar collapsed. The server checks administrator access before offering Admin.
+Both password login and remembered login open Home. The dashboard tab `login` presents Welcome to visitors and Home to signed-in users. Home shows the active league selector, team, round, balance and squad size. The first three Home shortcuts are **Lineup**, **My team** and **Today's market**. Account settings contains display timezone, factual sync preferences and logout. The page controls adapt to the screen size and the Home control remains reachable with the sidebar collapsed. The server checks administrator access before offering Admin.
 
 ## Floating Home and Refresh controls
 

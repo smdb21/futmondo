@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Welcome shortcut order (2026-11-27)
+
+The signed-in Home shortcut grid starts with Lineup, My team and Today’s market.
+
 ## Clubs label (2026-11-27)
 
 The shared player filter is labeled **Clubs** and the welcome feature description uses the same terminology.

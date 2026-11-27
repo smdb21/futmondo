@@ -1,5 +1,9 @@
 # Futmondo data review and implementation results
 
+## Welcome shortcut order (2026-11-27)
+
+The welcome-page fixture checks the first three rendered shortcut labels and their destination IDs. Chromium verified the visible order at 320 and 1440 px and opened both swapped destinations. Home reorders the existing navigation rows once per permission state. The change adds no requests, timers or rendered elements.
+
 ## Clubs label (2026-11-27)
 
 The rendered filter label read “Clubs” and the welcome description used “clubs”. All 21 player filter checks passed. The text uses the existing elements and adds no requests, rendering steps or reactive dependencies.

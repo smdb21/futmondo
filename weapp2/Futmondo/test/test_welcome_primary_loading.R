@@ -59,6 +59,10 @@ shiny::testServer(app_server,{
   grepl('0 €',output$home_balance$html),grepl('17 players',output$home_squad$html),
   grepl('Continue to Rivals',output$home_continue$html),grepl('data-fm-page="admin"',output$home_destinations$html),
   sum(calls=='get_market_players')==1L, sum(calls=='get_championship_pressroom')==1L)
+ tiles <- xml2::xml_find_all(xml2::read_html(output$home_destinations$html), '//*[@data-fm-page]')
+ stopifnot(identical(head(xml2::xml_attr(tiles, 'data-fm-page'), 3L), c('lineup','yourteam','today')),
+   identical(trimws(xml2::xml_text(xml2::xml_find_first(tiles[1:3], './/strong'))),
+     c('Lineup','My team',"Today's market")))
  balance <- xml2::read_html(output$home_balance$html)
  stale_card <- as.character(home_observation(list(status='stale', observed_at=as.POSIXct('2001-02-03', tz='UTC')), '17 players'))
  stopifnot(grepl('May be out of date', stale_card, fixed=TRUE), !grepl('Last observed|2001', stale_card))
