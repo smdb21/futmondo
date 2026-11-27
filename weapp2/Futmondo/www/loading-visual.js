@@ -37,6 +37,7 @@
   var opponents = clubs.filter(function (club) { return club.family !== firstClub.family; });
   var selectedClubs = [firstClub,opponents[Math.floor(Math.random()*opponents.length)]];
   var teamIds = selectedClubs.map(function (club) { return club.id; }).join(' ');
+  var ballPhaseX = Math.random()*tau, ballPhaseY = Math.random()*tau;
   var paths = [
     [[50,40],[370,40],[370,240],[50,240],[50,40]],
     [[210,40],[210,240]],
@@ -216,6 +217,54 @@
       ctx.beginPath(); ctx.arc(x,y,1.25,0,tau); ctx.fill();
     });
   }
+  function soccerBall(ctx, t, opacity, camera, markScale) {
+    if (opacity <= .001) return;
+    // Sample the same rolling path backwards, projecting each point with the current camera.
+    var elapsed = camera ? Math.max(0,t-1.2) : 0;
+    var steps = 8, tail = Math.min(.48,elapsed);
+    var previousX, previousY, x, y, scale;
+    ctx.strokeStyle = palette.accent;
+    for (var i = tail ? 0 : steps; i <= steps; i++) {
+      var fraction = i/steps, time = elapsed-tail*(1-fraction);
+      x = 210+132*Math.sin(ballPhaseX+.74*time);
+      y = 140+73*Math.sin(ballPhaseY+1.08*time);
+      scale = 1;
+      if (camera) {
+        project(camera,x,y,0);
+        x = camera.px; y = camera.py; scale = camera.k;
+      }
+      if (previousX !== undefined) {
+        ctx.globalAlpha = opacity*.7*fraction;
+        ctx.lineWidth = scale*markScale*(.6+2*fraction);
+        ctx.beginPath(); ctx.moveTo(previousX,previousY); ctx.lineTo(x,y); ctx.stroke();
+      }
+      previousX = x; previousY = y;
+    }
+    var radius = 5.3*scale*Math.sqrt(markScale);
+    if (camera) y -= radius*camera.st;
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#263345';
+    ctx.lineWidth = radius*.16;
+    ctx.beginPath(); ctx.arc(x,y,radius,0,tau); ctx.fill(); ctx.stroke();
+    // A rotating pentagon and five rim panels remain readable at compact sizes.
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.beginPath();
+    var rotation = elapsed*3;
+    for (var j = 0; j < 5; j++) {
+      var angle = rotation+j*tau/5;
+      var px = x+.44*radius*Math.cos(angle), py = y+.44*radius*Math.sin(angle);
+      if (!j) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    for (var k = 0; k < 5; k++) {
+      var edge = rotation+(k+.5)*tau/5;
+      ctx.moveTo(x+.7*radius*Math.cos(edge),y+.7*radius*Math.sin(edge));
+      ctx.arc(x,y,radius,edge-.26,edge+.26);
+      ctx.closePath();
+    }
+    ctx.fill();
+  }
   function raisedBoard(ctx, opacity, markScale, camera) {
     if (opacity <= .001 || camera.turn <= .001) return;
     var corners = paths[0];
@@ -393,6 +442,7 @@
     var board = (1-leave)*.56 + ease((t-detectionStart)/1.2)*(.25+.31*returnPitch);
     if (camera) raisedBoard(ctx,1-leave,instance.markScale,camera);
     pitch(ctx,board,instance.markScale,camera);
+    soccerBall(ctx,t,camera ? 1-camera.approach : returnPitch,camera,instance.markScale);
     for (var actorIndex = 0; actorIndex < actors.length; actorIndex++)
       instance.lifts[actorIndex] = ease((t-riseStart-actors[actorIndex].delay)/riseDuration);
     if (camera) risingPlayers(ctx,1-leave,instance.markScale,camera,instance.lifts,t);

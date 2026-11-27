@@ -38,6 +38,14 @@ player detection at 20.7, and the return to the pitch at 23.7. It uses the exist
 colors and compact-size stroke scaling; no models, textures or network assets
 are required. The extended loop never prolongs loading or changes readiness.
 
+A black-and-white soccer ball starts at a random pitch position shared by the
+page’s loaders. As the field tilts, it rolls along a curved path with spinning
+panels. `soccerBall()` draws the most recent 0.48 seconds of motion as eight
+tapered segments in the theme accent color. Each segment uses the current pitch
+projection so the trail stays on the grass through camera movement. The ball
+fades during the close-up and reappears at its opening position as the flat
+field returns. The trail uses the existing frame clock and stores no history.
+
 The private `cameraAt(t, instance)` helper computes the view once per frame,
 fitting the establishing view to the canvas. During flight the framing uses
 that reference view, so a rotating corner cannot shift or rescale the pitch. Camera rotation

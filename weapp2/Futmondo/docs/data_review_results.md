@@ -6888,3 +6888,9 @@ The offline My Team widget rendered **Leaving on**. All eight squad table checks
 At a 390 px viewport, the same 12 synthetic player rows measured 46.19, 57.28 or 62.28 px with the original CSS. Wrapped names and a two-line offer increased the height through the combined outer and inner cell padding. With the new spacing every row measured 46 px. The shared-table Chromium suite passed at 320, 390 and 1440 px in both themes. It checked that both position badges fit side by side, both offer lines fit vertically, and scrolling, column resizing, row selection and data updates still worked.
 
 The layout uses CSS on existing table body elements. It adds no DOM nodes, reactive work, timers, API calls or database reads. The fixture heartbeat took 259–263 ms across the six browser runs. The offline Shiny lifecycle passed 14 checks and eight tabs. Verification used local synthetic data.
+
+## Loading pitch soccer ball · 2026-11-26
+
+Offline Chromium verified two seeded opening positions on both the full-size and compact pitch. At 320, 390 and 1440 px in both themes, the ball stayed connected to eight progressively fainter trail segments, disappeared with the pitch and returned at the loop seam. Reduced motion used the static illustration with zero animated draws.
+
+The ball shares the existing 30 fps renderer, computes a fixed-length trail from scene time and adds no timers, image downloads, API calls or database work. With the full-size and compact loaders visible together, p95 draw time was 1.1–1.3 ms. The pitch stage measured 2.8–3.4 ms at simulated 4× CPU slowdown. Hidden and removed scenes stopped drawing. The offline Shiny lifecycle passed 14 checks and eight tabs.

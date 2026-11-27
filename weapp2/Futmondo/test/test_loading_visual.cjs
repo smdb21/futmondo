@@ -166,6 +166,36 @@ function polygonArea(points) {
     return sum + point[0] * next[1] - next[0] * point[1];
   }, 0)) / 2;
 }
+function isBall(mark) {
+  return mark.kind === 'fill' && mark.color === '#ffffff' &&
+    mark.path.length === 1 && mark.path[0].op === 'arc';
+}
+function isPlayerHead(mark) {
+  return mark.kind === 'fill' && !isBall(mark) && mark.path.length === 1 &&
+    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5;
+}
+function checkBall(phases) {
+  const opening = phases.pitch.filter(isBall);
+  assert.equal(opening.length, 1);
+  const [x, y, radius] = opening[0].path[0].args;
+  assert.ok(x-radius > 50 && x+radius < 370 && y-radius > 40 && y+radius < 240);
+  const rolling = phases.rising.findIndex(isBall);
+  assert.ok(rolling >= 8);
+  const trail = phases.rising.slice(rolling-8, rolling);
+  for (const [i, segment] of trail.entries()) {
+    assert.deepEqual(segment.path.map(command => command.op), ['moveTo', 'lineTo']);
+    assert.ok(Math.hypot(...segment.path[1].args.map((value, axis) => value-segment.path[0].args[axis])) > 0);
+    if (i) {
+      assert.deepEqual(segment.path[0].args, trail[i-1].path[1].args);
+      assert.ok(segment.alpha > trail[i-1].alpha, 'Older trail segments fade');
+    }
+  }
+  const [ballX, ballY, ballRadius] = phases.rising[rolling].path[0].args;
+  const [endX, endY] = trail.at(-1).path[1].args;
+  assert.equal(endX, ballX);
+  assert.ok(Math.abs(endY-ballY) <= ballRadius, 'The trail meets the rolling ball');
+  assert.ok(!phases.flock.some(isBall), 'The ball leaves with the pitch');
+}
 function checkGeometry(phases) {
   const flat = pitchCorners(phases.pitch);
   const expected = [[50, 40], [370, 40], [370, 240], [50, 240]];
@@ -180,8 +210,7 @@ function checkGeometry(phases) {
     const [x, y] = command.args;
     assert.ok(x >= 0 && x <= 420 && y >= 0 && y <= 280, `Projected marks stay inside the scene (${x}, ${y})`);
   }
-  const heads = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
-    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5).map(mark => mark.path[0].args);
+  const heads = phases.rising.filter(isPlayerHead).map(mark => mark.path[0].args);
   const feet = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
     mark.path[0].op === 'ellipse' && mark.path[0].args[2] > 2 && mark.path[0].args[2] < 15).map(mark => mark.path[0].args);
   assert.equal(heads.length, 22, 'Both teams have eleven raised player heads');
@@ -195,8 +224,7 @@ function checkTeams(phases, teamColors) {
     for (const color of teamColors)
       assert.equal(marks.filter(mark => mark.color === color).length, expected, label + ' retains each team tone');
   }
-  const heads = phases.rising.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
-    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
+  const heads = phases.rising.filter(isPlayerHead);
   countTeams(heads, 11, 'Raised heads');
   let previousHead = -1;
   for (const head of heads) {
@@ -295,8 +323,7 @@ function checkGoalFacing(geometry, teamColors) {
     mark.path.length === 1 && mark.path[0].op === 'ellipse');
   const feet = geometry.filter(mark => mark.kind === 'fill' && Math.abs(mark.alpha - 0.8) < 0.01 &&
     mark.path.length === 4 && teamColors.includes(mark.color));
-  const heads = geometry.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
-    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
+  const heads = geometry.filter(isPlayerHead);
   const noses = geometry.filter(mark => mark.kind === 'fill' && mark.path.length === 3 &&
     Math.abs(mark.alpha - 0.9) < 0.01 && teamColors.includes(mark.color));
   assert.equal(anchors.length, 22);
@@ -372,8 +399,7 @@ function checkAscent({release, dissolve, rising, flyby, approach}) {
   for (let i = before.length - 22; i < before.length; i++)
     assert.ok(Math.hypot(...before[i].path[0].args.slice(0, 2).map((n, axis) => n - after[i].path[0].args[axis])) < 0.1,
       'Lower foot particles leave after the head particles');
-  const heads = marks => marks.filter(mark => mark.kind === 'fill' && mark.path.length === 1 &&
-    mark.path[0].op === 'arc' && mark.path[0].args[2] > 1.5);
+  const heads = marks => marks.filter(isPlayerHead);
   assert.equal(heads(rising).length, 22);
   assert.equal(heads(flyby).length, 22, 'Both teams are still drawn during the banking pass');
   const edgeX = geometry => pitchCorners(geometry)[1][0] - pitchCorners(geometry)[0][0];
@@ -513,6 +539,19 @@ async function fullscreenChecks(browser) {
     assert.deepEqual(external, []);
     await page.close();
   }
+}
+
+async function ballStartChecks(browser) {
+  const {page} = await createPage(browser, 390);
+  for (const [seed, expected] of [['0,0,0.25,0.75', [342,67]], ['0,0,0.75,0.25', [78,213]]]) {
+    await page.goto(origin + '/?kits=' + seed, {waitUntil: 'domcontentloaded'});
+    for (const id of ['fixture-hero', 'fixture-compact']) {
+      const ball = (await captureGeometry(page,id)).find(isBall);
+      assert.deepEqual(ball.path[0].args.slice(0,2), expected, 'Both loaders use the random opening position');
+    }
+  }
+  await page.close();
+  console.log('PASS two seeded starts in both the hero and compact pitch');
 }
 
 async function clubChecks(browser) {
@@ -657,6 +696,7 @@ async function visualChecks(browser) {
       }
       assert.equal(new Set(pictures).size, pictures.length, 'Each loop phase renders changing graphics');
       checkGeometry(phases);
+      checkBall(phases);
       assert.deepEqual(particleMarks(phases.flock).map(mark => mark.alpha),
         particleMarks(phases.lateFlock).map(mark => mark.alpha), 'The cloud remains fully formed near the end of its longer stage');
       assert.notDeepEqual(particleMarks(phases.flock), particleMarks(phases.lateFlock), 'The cloud keeps moving throughout the longer stage');
@@ -771,6 +811,7 @@ async function visualChecks(browser) {
     await page.close();
     console.log('PASS initial ' + fallback + ': static illustration, no animated draws');
   }
+  await ballStartChecks(browser);
   await fullscreenChecks(browser);
   await clubChecks(browser);
   const files = ['www/loading-visual.js', 'www/loading-visual.css', 'loading_visual.R'];
@@ -842,6 +883,6 @@ async function appChecks(browser) {
 (async () => {
   const executablePath = process.env.FUTMONDO_TEST_CHROMIUM || '/tmp/futmondo-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
   const browser = await chromium.launch({headless: true, executablePath, args: ['--no-sandbox']});
-  try { await (fullApp ? appChecks(browser) : process.argv.includes("--camera-only") ? cameraChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
+  try { await (fullApp ? appChecks(browser) : process.argv.includes("--ball-start-only") ? ballStartChecks(browser) : process.argv.includes("--camera-only") ? cameraChecks(browser) : process.argv.includes("--fullscreen-only") ? fullscreenChecks(browser) : process.argv.includes("--clubs-only") ? clubChecks(browser) : visualChecks(browser)); }
   finally { await browser.close(); }
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });

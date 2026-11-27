@@ -2768,3 +2768,7 @@ My Team displays the pending clause transfer date under **Leaving on**.
 ## Player table row height · 2026-11-26
 
 Implemented and verified locally. The shared player table keeps single- and dual-position players aligned, including rows with a two-line name or offer. [Browser measurements](data_review_results.md#player-table-row-height--2026-11-26)
+
+## Loading pitch soccer ball · 2026-11-26
+
+Implemented locally. The shared pitch animation shows a rolling soccer ball with a random starting position and a short fading trail. [Rendering details](progressive_loading.md#pitch-murmuration-and-radar-loading-visual)
