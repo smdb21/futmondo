@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Points and ranks switch (2026-11-26)
+
+Chromium verified that the same two selected rounds showed 15 and 12 cumulative points or ranks 1 and 1 for the leading team. First place appeared at the top. After narrowing Ranks to one subround, switching back to Points showed its 15 season points. Switch and range changes added zero saved reads at 320, 390 and 1440 px in both themes.
+
+The shared plot publishes only the selected metric and rounds. Switching metrics reuses calculated totals, and publishing identical saved observations caused zero chart redraws in the delayed-history browser test. The 13 plot checks, delayed reads, status disclosures, 10 round-award checks for the shared switch styling, and offline lifecycle (14 checks and eight tabs) passed with synthetic data. [Range and switch checks](../test/test_plots_browser.cjs) · [Delayed-history check](../test/test_plots_loading_browser.cjs)
+
 ## Standings round range (2026-11-26)
 
 A separate offline initialization check against revision `165580a` reproduced a startup error in Standings. The verified-history lookup was outside the reactive that defines the team history. Keeping that lookup beside the saved ranking read lets the module initialize and supplies the existing participation evidence to the chart.

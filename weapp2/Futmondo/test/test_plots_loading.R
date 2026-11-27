@@ -16,7 +16,7 @@ settle <- function(session) for(i in 1:15) {later::run_now(0);session$flushReact
 shiny::testServer(plots_Server,args=list(
  is_module_active=reactive(TRUE),login_token=reactive(auth),championship_id=reactive('league'),
  user_team_id=reactive('a'),user_teams_RV=reactive(req(directory()))),{
- session$setInputs(plot_tab='Standings')
+ session$setInputs(plot_tab='Points')
  settle(session)
  stopifnot(setequal(grep('get_user_team_rounds:', calls, fixed=TRUE, value=TRUE), 'get_user_team_rounds:a'),
    'get_classification_round_catalog:' %in% calls, !'get_league_standings_history:' %in% calls)
@@ -49,18 +49,19 @@ shiny::testServer(plots_Server,args=list(
  before <- calls
  session$setInputs(standings_from='2.2', standings_through='2.2')
  settle(session)
- visible <- standings_rows()
+ visible <- round_series()$rows
  stopifnot(identical(calls,before), all(visible$round==2.2),
    identical(visible$points[visible$team_name=='Beta'],3),
    is.na(visible$points[visible$team_name=='Alpha']))
  session$setInputs(standings_from='first', standings_through='latest')
  settle(session)
- stopifnot(identical(standings_rows()$round, round_totals()$round), identical(calls,before))
+ stopifnot(identical(round_series()$rows$round, round_totals()$round), identical(calls,before))
  cat('PASS standings subround range preserves cumulative scores and gaps with zero extra reads\n')
- session$setInputs(rank_range=c(2,2.2),plot_tab='Rank progression')
+ session$setInputs(standings_from='2',show_ranks=TRUE)
  settle(session)
- rank <- plotly::plotly_build(rank_plot())
- stopifnot(identical(calls,before),all(unlist(rank$x$layout$xaxis$categoryarray)%in%c('2','2.2')))
+ rank <- plotly::plotly_build(standings_plot())
+ stopifnot(identical(calls,before),identical(unlist(rank$x$layout$xaxis$categoryarray),c('2','2.2')),
+   identical(rank$x$layout$yaxis$autorange,'reversed'), all(is.na(round_series()$rows$rank)))
  cat('PASS round filtering reuses reads and cumulative totals\n')
 })
 

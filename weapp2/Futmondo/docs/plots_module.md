@@ -1,12 +1,12 @@
 # Trends
 
-## Standings round range (2026-11-26)
+## Points and ranks (2026-11-26)
 
-**From round** and **Through round** select an inclusive interval on the standings chart. The choices follow the chart’s kickoff order, including decimal subrounds and fixtures played early. Choosing the same round at both ends shows one round. The defaults span the first to the latest published round and follow newly published history.
+**Trends → Points** opens with cumulative season points. Use the **Points / Ranks** switch to see each team's league position for the same rounds. First place appears at the top. A missing score leaves a gap in the affected team's points, and a round with incomplete comparable totals has no verified ranks.
 
-The range filters the existing cumulative point series after season totals are calculated. Both endpoints include earlier rounds’ contributions, and missing scores keep their gaps. Changing the range only updates the Standings view. Rank progression has its own range control.
+**From round** and **Through round** select an inclusive interval in kickoff order, including decimal subrounds and fixtures played early. Choose the same round at both ends to inspect one round. The first and latest published rounds are selected by default. Changing the view keeps both endpoints. Earlier rounds still contribute to the season totals and positions.
 
-`plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide the top-level **Trends** page. It presents one full-width, phone-friendly chart at a time: league standings, squad values, cash and transfers, money movements, rank progression, and real-team ownership. Chart controls belong to their chart tab and do not alter Classification-table filters.
+`plots_UI(id)` and `plots_Server(id, is_module_active, login_token, championship_id, user_team_id, user_teams_RV, refresh_trigger = NULL)` provide five chart tabs on **Trends**. Points, Squad values, Cash & transfers, Money movements and Owned by real team each have their own controls. The Points tab sends the selected metric and visible interval to one Plotly output. The switch reuses the existing team histories, published rankings and cumulative totals.
 
 `plots_owned_by_real_team(players)` is a pure helper returning `real_team_id`, `real_team`, and `owned_players`. It counts each immutable player ID once only when both a current fantasy owner ID and a real-team ID/name are present. Free agents and rows with unverifiable club data are excluded. Rows are ordered by descending count then club name.
 

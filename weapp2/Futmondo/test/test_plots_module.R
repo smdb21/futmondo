@@ -13,11 +13,12 @@ check('owned real-team aggregation is descending with stable name tie-break', {
   d <- plots_owned_by_real_team(p)
   stopifnot(identical(d$real_team, c('Alpha','Beta')), identical(d$owned_players, c(2L,1L)))
 })
-check('plots UI exposes six factual chart tabs', {
+check('plots UI exposes five factual chart tabs and one points/ranks switch', {
   html <- as.character(plots_UI('plots'))
+  stopifnot(!grepl('rank_plot|rank_range|Rank progression',html), grepl('data-value="Points"', html, fixed=TRUE))
   pages <- fm_navigation_pages()
   stopifnot(identical(pages$label[pages$tab == "plots"], "Trends"), grepl("<h2>Trends</h2>", html, fixed=TRUE))
-  for (id in c('standings_plot','values_plot','cash_plot','transfers_plot','rank_plot','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
+  for (id in c('standings_plot','values_plot','cash_plot','transfers_plot','show_ranks','owned_club_plot')) stopifnot(grepl(id, html, fixed=TRUE))
 })
 check('round totals preserve subrounds, revisions, negative and missing points', {
   rows <- data.frame(team_id=c(rep('a',5),rep('b',3)), team_name=c(rep('Alpha',5),rep('Beta',3)),

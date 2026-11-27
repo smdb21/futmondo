@@ -32,23 +32,29 @@ bind_factual_reads <- function(...) invisible(NULL)
 get_league_standings_history <- function(...) record('history',data.frame())
 get_financial_snapshot <- function(...) record('finance',list(configuration=list(budget=100)))
 get_championship_pressroom <- function(...) record('transfers',data.frame())
+get_classification_round_catalog <- function(...) list(rounds=data.frame())
 get_user_team_rounds <- function(...) record('rounds',list())
 get_championship_players <- function(...) record('players',data.frame())
 shiny::testServer(plots_Server, args=list(is_module_active=function()TRUE,
   login_token=function()c(userid='fixture',token='synthetic'), championship_id=function()'league',
   user_team_id=function()'team', user_teams_RV=function()data.frame(teamid='team',teamname='Team')), {
   session$flushReact()
-  for(key in c('standings','values','cash','rank','owned_club')) {
-    html <- output[[paste0(key,'_status')]]$html
-    stopifnot(length(details(html))==1L, !is.null(output[[paste0(key,'_plot')]]))
+  tabs <- c("Points"="standings", "Squad values"="values", "Cash & transfers"="cash",
+    "Owned by real team"="owned_club")
+  for (tab in names(tabs)) {
+    session$setInputs(plot_tab=tab)
+    stopifnot(length(details(output$chart_status$html))==1L,
+      !is.null(output[[paste0(tabs[[tab]],'_plot')]]))
   }
   before <- as.list(calls)
+  session$setInputs(plot_tab="Points", show_ranks=TRUE)
+  stopifnot(length(details(output$chart_status$html))==1L, !is.null(output$standings_plot))
   for(i in seq_len(5L)) {
     session$flushReact()
-    invisible(output$standings_status); invisible(output$standings_plot)
-    invisible(output$values_status); invisible(output$values_plot)
+    invisible(output$chart_status); invisible(output$standings_plot)
   }
-  stopifnot(identical(before,as.list(calls)), calls$history==1L,
+  # Squad values and Cash each enter the tab-scoped valuation reader once.
+  stopifnot(identical(before,as.list(calls)), calls$history==2L,
     calls$finance==1L,calls$transfers==1L,calls$rounds==1L,calls$players==1L)
 })
 cat('PASS paired plot/status consumers share one result and add zero repeated reads\n')

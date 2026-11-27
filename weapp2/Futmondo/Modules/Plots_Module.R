@@ -279,9 +279,12 @@ plots_UI <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(shiny::h2("Trends"), shiny::uiOutput(ns("chart_status")),
     shiny::tabsetPanel(id=ns("plot_tab"), type="pills",
-      shiny::tabPanel("Standings",
-        shiny::p("Season points accumulated through each published round or subround. Missing scores leave gaps."),
+      shiny::tabPanel("Points",
+        shiny::p("Compare season points or league rank after each published round or subround. First place is at the top in Ranks. Missing scores leave gaps."),
         shiny::fluidRow(
+          shiny::column(3, shiny::tags$label(class = "fm-view-switch", "Points",
+            shiny::tags$input(id = ns("show_ranks"), type = "checkbox", role = "switch", `aria-label` = "Show ranks"),
+            "Ranks")),
           shiny::column(3, shiny::selectInput(ns("standings_from"), "From round",
             choices = c("First published" = "first"), selectize = FALSE, width = "100%")),
           shiny::column(3, shiny::selectInput(ns("standings_through"), "Through round",
@@ -295,7 +298,6 @@ plots_UI <- function(id) {
           choices = c("Day" = "day", "Week" = "week", "Month" = "month"), selected = "week", inline = TRUE),
         shiny::uiOutput(ns("transfers_status")),
         plotly::plotlyOutput(ns("transfers_plot"), height = "420px")),
-      shiny::tabPanel("Rank progression", shiny::p("Each fantasy team's rank from cumulative published round points; first place is at the top. The range selects which rounds are displayed."), shiny::sliderInput(ns("rank_range"),"Rounds",min=1,max=38,value=c(1,38),step=0.1), plotly::plotlyOutput(ns("rank_plot"), height="420px")),
       shiny::tabPanel("Owned by real team", shiny::p("Currently fantasy-owned players, grouped by their real football club."), plotly::plotlyOutput(ns("owned_club_plot"), height="520px"))
     ))
 }
@@ -310,7 +312,7 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       if (is.function(refresh_trigger)) refresh_trigger()
       tryCatch(get_league_standings_history(championship_id()), error = function(e) data.frame())
     })
-    standings_rows <- resource_display_source(session, function() {
+    round_series <- resource_display_source(session, function() {
       totals <- round_totals()
       rounds <- round_domain()
       if (length(rounds)) {
@@ -320,9 +322,15 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
         rounds <- rounds[seq.int(start, end)]
       }
       keep <- totals$round %in% rounds
-      data.frame(team_name = totals$team_name[keep], round = totals$round[keep], points = totals$points[keep])
+      metric <- if (isTRUE(input$show_ranks)) "rank" else "points"
+      rows <- data.frame(team_name = totals$team_name[keep], round = totals$round[keep])
+      rows[[metric]] <- totals[[metric]][keep]
+      list(rows = rows, metric = metric)
     })
-    standings_plot <- shiny::reactive({ plots_round_chart(standings_rows(), "points") })
+    standings_plot <- shiny::reactive({
+      series <- round_series()
+      plots_round_chart(series$rows, series$metric)
+    })
     values_plot <- shiny::reactive({ plots_history(history(),"team_value","Squad valuation (EUR)") })
     cash_date_scope <- NULL
     shiny::observe({
@@ -558,11 +566,6 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
       shiny::updateSelectInput(session, "standings_through", choices = c("Latest published" = "latest", rounds),
         selected = if (length(selected) && selected %in% rounds) selected else "latest")
     })
-    shiny::observe({
-      numbers <- round_domain()
-      if(length(numbers)) shiny::updateSliderInput(session,"rank_range",min=min(numbers),max=max(numbers),
-        value=range(numbers),step=0.1)
-    })
     round_status <- shiny::reactive({
       state <- round_state()
       totals <- round_totals()
@@ -577,15 +580,9 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
         if (!state$loading && length(missing)) fm_info(paste0(
           "Some saved round scores are missing. The first missing score is in round ", missing[1L],
           ". Affected teams' cumulative results stop at that point."), error = TRUE),
-        if (identical(input$plot_tab, "Rank progression") && length(other)) fm_info(
+        if (isTRUE(input$show_ranks) && length(other)) fm_info(
           "Some saved rankings include teams outside the current league directory. Ranks for those rounds need their cumulative scores.", error = TRUE)
       )
-    })
-    rank_plot <- shiny::reactive({
-      h <- round_totals()
-      z <- input$rank_range
-      if(length(z)==2) h <- h[h$round>=z[1] & h$round<=z[2],,drop=FALSE]
-      plots_round_chart(h, "rank")
     })
     owned_club_plot <- shiny::reactive({
       shiny::req(active(),login_token(),championship_id())
@@ -597,14 +594,13 @@ plots_Server <- function(id,is_module_active,login_token,championship_id,user_te
     output$chart_status <- shiny::renderUI({
       shiny::req(active(), input$plot_tab)
       switch(input$plot_tab,
-        "Standings" = round_status(),
-        "Rank progression" = round_status(),
+        "Points" = round_status(),
         "Squad values" = attr(values_plot(), "fm_info"),
         "Cash & transfers" = attr(cash_plot(), "fm_info"),
         "Owned by real team" = attr(owned_club_plot(), "fm_info"))
     })
     plot_sources <- list(standings=standings_plot, values=values_plot, cash=cash_plot,
-      rank=rank_plot, owned_club=owned_club_plot)
+      owned_club=owned_club_plot)
     for (key in names(plot_sources)) local({
       source <- plot_sources[[key]]
       output[[paste0(key, "_plot")]] <- plotly::renderPlotly(source())

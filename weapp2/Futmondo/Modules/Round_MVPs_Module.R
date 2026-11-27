@@ -274,7 +274,7 @@ round_mvps_UI <- function(id) {
     tabsetPanel(id = ns("award_tab"), type = "pills", selected = "statistics",
       tabPanel("Statistics", value = "statistics",
         tags$div(class = "award-statistics",
-          tags$label(class = "award-group-switch",
+          tags$label(class = "fm-view-switch",
             tags$input(id = ns("group_by_club"), type = "checkbox", role = "switch"),
             "Group by club"),
           uiOutput(ns("award_statistics")))),

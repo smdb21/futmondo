@@ -1225,21 +1225,21 @@ input[type=checkbox], input[type=radio] { accent-color: var(--fm-text); }
 
 .award-statistics { margin-top: 14px; min-width: 0; }
 .award-stats-summary, .award-charts { display: grid; gap: 12px; }
-.award-group-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; margin: 0 0 8px; cursor: pointer; }
-.award-group-switch input[type="checkbox"] {
+.fm-view-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; margin: 0 0 8px; cursor: pointer; }
+.fm-view-switch input[type="checkbox"] {
   appearance: none; position: relative; width: 34px; height: 20px; margin: 0;
   border: 2px solid var(--fm-muted); border-radius: 12px; background: var(--fm-surface); cursor: pointer;
 }
-.award-group-switch input::before {
+.fm-view-switch input::before {
   content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px;
   border-radius: 50%; background: var(--fm-muted);
 }
-.award-group-switch input:checked { background: var(--fm-accent); border-color: var(--fm-accent); }
-.award-group-switch input:checked::before { transform: translateX(14px); background: var(--fm-surface); }
-.award-group-switch input:focus-visible { outline: 2px solid var(--fm-accent); outline-offset: 2px; }
+.fm-view-switch input:checked { background: var(--fm-accent); border-color: var(--fm-accent); }
+.fm-view-switch input:checked::before { transform: translateX(14px); background: var(--fm-surface); }
+.fm-view-switch input:focus-visible { outline: 2px solid var(--fm-accent); outline-offset: 2px; }
 @media (forced-colors: active) {
-  .award-group-switch input[type="checkbox"] { appearance: auto; }
-  .award-group-switch input::before { content: none; }
+  .fm-view-switch input[type="checkbox"] { appearance: auto; }
+  .fm-view-switch input::before { content: none; }
 }
 .award-stats-summary {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 125px), 1fr));

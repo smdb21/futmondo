@@ -14,7 +14,8 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    await wait('standings_plot');
    const rounds=await plot('standings_plot').evaluate(el=>({type:el.layout.xaxis.type,x:[...el.data[0].x],y:[...el.data[0].y]}));
    assert.equal(rounds.type,'category');assert.deepEqual(rounds.x,['6','6.2','7']);assert.deepEqual(rounds.y,[10,15,12]);
-   assert.equal(await page.locator('[id="plots-rank_round"]').count(),0);
+   assert.equal(await page.getByRole('switch',{name:'Show ranks',exact:true}).isChecked(),false);
+   assert.equal(await page.getByRole('tab',{name:'Rank progression',exact:true}).count(),0);
    const from=page.getByLabel('From round',{exact:true});
    const through=page.getByLabel('Through round',{exact:true});
    await from.selectOption('6.2');
@@ -33,7 +34,7 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    await from.selectOption('first');
    await through.selectOption('latest');
    await waitRounds(rounds.x,rounds.y);
-   for(const [tab,id] of [['Squad values','values_plot'],['Cash & transfers','cash_plot'],['Rank progression','rank_plot'],['Owned by real team','owned_club_plot']]){
+   for(const [tab,id] of [['Squad values','values_plot'],['Cash & transfers','cash_plot'],['Owned by real team','owned_club_plot']]){
     await page.getByRole('tab',{name:tab,exact:true}).click();await wait(id);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,`${tab} overflow at ${width}`);
     if(id==='values_plot')assert.equal(await plot(id).evaluate(el=>el.layout.xaxis.tickformat),'%b-%d');
@@ -56,9 +57,17 @@ const {chromium}=require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/futmon
    }
    await page.getByRole('button',{name:'Measure saved reads'}).click();await page.waitForTimeout(200);
    const before=await page.locator('#counts').innerText();
-   await page.getByRole('tab',{name:'Rank progression',exact:true}).click();
-   await page.evaluate(()=>Shiny.setInputValue('plots-rank_range',[6.2,7],{priority:'event'}));
-   await page.waitForFunction(()=>document.querySelector('#plots-rank_plot').data[0].x.length===2);
+   await page.getByRole('tab',{name:'Points',exact:true}).click();
+   await from.selectOption('6.2');
+   await waitRounds(['6.2','7'],[15,12]);
+   await page.getByRole('switch',{name:'Show ranks',exact:true}).check();
+   await waitRounds(['6.2','7'],[1,1]);
+   const rankAxis=await plot('standings_plot').evaluate(el=>el._fullLayout.yaxis.range);
+   assert.ok(rankAxis[0]>rankAxis[1],'First place is at the top');
+   await through.selectOption('6.2');
+   await waitRounds(['6.2'],[1]);
+   await page.getByRole('switch',{name:'Show ranks',exact:true}).uncheck();
+   await waitRounds(['6.2'],[15]);
    await page.getByRole('button',{name:'Measure saved reads'}).click();await page.waitForTimeout(200);
    assert.equal(await page.locator('#counts').innerText(),before,'Range changes reuse saved reads');
    assert.deepEqual(errors,[]);console.log(`PASS ${width}px ${theme}: all plots, subrounds, toolbar, crests, colors, no overflow or extra range reads`);

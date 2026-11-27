@@ -111,15 +111,15 @@ app_check('full server login, navigation, refresh and logout',{
    yourteam=c('players_in_teams-team_value_box','players_in_teams-players_table_in_teams-players_table'),
    players_in_championship='players_in_championship-championship_players_table-players_table',
    rivals=c('rivals-league_finances_table','rivals-league_finances_plot','rivals-team_valuation_history_plot'),
-   plots=c('plots-standings_plot','plots-values_plot','plots-cash_plot','plots-rank_plot','plots-owned_club_plot'),
+   plots=c('plots-standings_plot','plots-values_plot','plots-cash_plot','plots-owned_club_plot'),
    classification=c('classification-classification_table','classification-rank_evolution_plot','classification-dreamteam_box_ui'),
    round_mvps='round_mvps-mvp_cards',notifications=c('notifications-status','notifications-items'))
   for(tab in names(tabs)){
    session$setInputs(tabs=tab);app_settle(session)
    for(id in tabs[[tab]]) {
     if(tab=='plots') {
-     subtab<-c('plots-standings_plot'='Standings','plots-values_plot'='Squad values',
-      'plots-cash_plot'='Cash & transfers','plots-rank_plot'='Rank progression',
+     subtab<-c('plots-standings_plot'='Points','plots-values_plot'='Squad values',
+      'plots-cash_plot'='Cash & transfers',
       'plots-owned_club_plot'='Owned by real team')
      session$setInputs(`plots-plot_tab`=unname(subtab[id]));app_settle(session)
     }
