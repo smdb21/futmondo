@@ -30,7 +30,7 @@ login_feature_tiers <- function() {
         feature("rival_cash", "Trace a rival’s estimated balance",
           "Follow opening cash, transfers and league rewards in a running ledger. See where the evidence is incomplete."),
         feature("live_substitutions", "Review live bench substitutions",
-          "Tap to check your starters against an announced La Liga XI and see eligible bench replacements before kickoff. Confirm a swap from Lineup or Classification."),
+          "Tap to check your starters against announced La Liga, Premier League or Serie A lineups and see eligible bench replacements before kickoff. Confirm a swap from Lineup or Classification."),
         feature("scheduled_lineups", "Prepare for confirmed signings",
           "Include signings due before kickoff in a draft XI and bench. Where enabled, approve a lineup submission timed for an incoming signing."),
         feature("round_award_rankings", "Find repeat Best XI and MVP picks",

@@ -22,7 +22,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 import httpx
-from worker.striker import LALIGA, Striker
+from worker.striker import LEAGUES, Striker
 from nacl.secret import SecretBox
 
 LOG = logging.getLogger('futmondo.worker')
@@ -394,7 +394,7 @@ class Helper:
         env = {k: v for k, v in os.environ.items() if k in
                ('PATH', 'LANG', 'LC_ALL', 'R_LIBS', 'R_LIBS_USER', 'R_LIBS_SITE', 'R_HOME', 'TMPDIR', 'OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS')}
         # Only public configuration reaches the R helper.
-        env['FUTMONDO_XI_COVERAGE'] = LALIGA if os.getenv('STRIKER_API_KEY') else 'not_configured'
+        env['FUTMONDO_XI_COVERAGE'] = ','.join(LEAGUES) if os.getenv('STRIKER_API_KEY') else 'not_configured'
         env['FUTMONDO_WORKER_HELPER'] = 'true'
         env['FUTMONDO_CLAUSE_OBSERVATIONS_ENABLED'] = 'true' if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() == 'true' else 'false'
         self.process = await asyncio.create_subprocess_exec('Rscript', '--vanilla', str(self.root / 'worker' / 'helper.R'),
@@ -491,7 +491,7 @@ def base_interval_seconds():
 class Worker:
     def __init__(self, store, client, key, root):
         self.store, self.client, self.key = store, client, key
-        self.club_xi = Striker(client, os.getenv('STRIKER_API_KEY', ''))
+        self.club_xi = Striker(client, os.getenv('STRIKER_API_KEY', ''), store)
         self.identity = str(uuid.uuid4())
         self.base_interval = base_interval_seconds()
         self.helpers = [Helper(root) for _ in range(max(1, min(2, int(os.getenv('FUTMONDO_WORKER_LANES', '2')))))]
@@ -770,7 +770,8 @@ class Worker:
                 return {'request': request}
             request = job.pop('_club_xi_request', None)
             fixture = message['fixture']
-            if not request or any(request.get(k) != fixture.get(k) for k in ('match_id','round_id','kickoff')):
+            if (not request or request.get('competition_id') != descriptor['context']['competition_id'] or
+                    any(request.get(k) != fixture.get(k) for k in ('match_id','round_id','kickoff'))):
                 raise WorkerFailure('source_route_denied')
             async with self.connections:
                 if time.time() >= fixture['unix']:

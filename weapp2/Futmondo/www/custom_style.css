@@ -1935,3 +1935,4 @@ html[data-fm-theme="light"] .fm-lineup-order { color: #334155; }
 
 .fm-club-xi-checks { display:flex; flex-wrap:wrap; gap:.4rem; }
 .fm-club-xi-checks .btn { max-width:100%; white-space:normal; }
+.fm-club-xi-checks .btn:disabled { opacity:.8; cursor:default; }

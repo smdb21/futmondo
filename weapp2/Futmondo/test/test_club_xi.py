@@ -4,13 +4,15 @@ from datetime import datetime, timezone
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 import time
 import unittest
 import httpx
 
 from worker.main import Helper, plain, pack_snapshot, unpack_snapshot
-from worker.striker import LALIGA, Striker, identify
+from worker.striker import Striker, identify
+
+LALIGA = "504e4f584d8bec9a67000079"
 
 
 def player(team, number):
@@ -30,6 +32,8 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.local.append(dict(id='unknown',teamId='home',name='unmapped'))
         self.calls = []
         self.code = 200
+        self.headers = {}
+        self.expected_league = "laliga"
         self.squad_outage = False
         self.client = httpx.AsyncClient(transport=httpx.MockTransport(self.serve))
         self.provider = self.service()
@@ -41,7 +45,9 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         await self.client.aclose()
 
     def service(self):
-        return Striker(self.client,'fixture-key')
+        store = AsyncMock()
+        store.rpc.return_value = 'synthetic-reservation'
+        return Striker(self.client,'fixture-key',store)
 
     def serve(self,req):
         self.assertEqual(req.method,'POST')
@@ -49,7 +55,7 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('fixture-key',str(req.url))
         endpoint = req.url.path.split('/')[-1]
         args = json.loads(req.content)
-        self.assertEqual(args['league'],'laliga')
+        self.assertEqual(args['league'],self.expected_league)
         self.calls.append(endpoint)
         if endpoint=='list_games':
             body = dict(games=[self.game])
@@ -62,10 +68,58 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
             if tid=='2' and self.squad_outage:
                 return httpx.Response(503)
             body = dict(team_id=tid,season=2026,count=13,players=[player(int(tid),i) for i in range(1,14)])
-        return httpx.Response(self.code,json=dict(data=body))
+        return httpx.Response(self.code,json=dict(data=body), headers=self.headers)
 
     async def check(self, clubs=None):
         return await self.provider.check(LALIGA,self.fixture,self.local,clubs or {})
+
+    async def test_monthly_limit_is_checked_only_on_cache_misses(self):
+        self.provider.store.rpc.return_value = None
+        result = await self.check()
+        self.assertEqual(result['status'], 'monthly_limit')
+        self.assertEqual(self.calls, [])
+        self.provider.store.rpc.return_value = 'reservation'
+        await self.check()
+        self.assertEqual(len(self.calls), 4)
+        self.provider.store.rpc.reset_mock()
+        self.provider.store.rpc.return_value = None
+        await self.check()
+        self.provider.store.rpc.assert_not_called()
+        self.assertEqual(len(self.calls), 4)
+
+    async def test_refund_retry_keeps_fetched_result(self):
+        self.headers = {'X-Credits-Used': '0'}
+        self.provider.store.rpc.side_effect = ['permit', RuntimeError('store offline')]
+        games, _ = await self.provider.read('laliga','list_games', {'date':'2026-11-26'}, 1800)
+        self.assertEqual(games['games'], [self.game])
+        self.assertEqual(self.provider.pending_settlement, ('permit', 0))
+        self.provider.store.rpc.side_effect = [None, None]
+        result = await self.check()
+        self.assertEqual(result['status'], 'monthly_limit')
+        self.assertIn((('settle_striker_call',), {'p_id':'permit','p_used':0}),
+                      self.provider.store.rpc.await_args_list)
+        self.assertIsNone(self.provider.pending_settlement)
+        self.assertEqual(self.calls, ['list_games'])
+
+    async def test_competition_routing_and_cache_isolation(self):
+        for competition, league, teams in [
+                (LALIGA, 'laliga', ('Valencia', 'Getafe')),
+                ('51c96d15e67621cf7000000d', 'soccer', ('Arsenal', 'Chelsea')),
+                ('51ad1f8f52c92e260f00000a', 'seriea', ('Napoli', 'Roma'))]:
+            self.expected_league = league
+            for side, name in zip(('home', 'away'), teams):
+                self.fixture[side + '_name'] = name
+                self.game[side]['name'] = name
+            self.calls.clear()
+            result = await self.provider.check(competition, self.fixture, self.local, {})
+            self.assertEqual(result['status'], 'confirmed')
+            self.assertEqual(self.calls, ['list_games', 'get_lineups', 'get_squad', 'get_squad'])
+            await self.provider.check(competition, self.fixture, self.local, {})
+            self.assertEqual(len(self.calls), 4)
+        self.provider.store.rpc.reset_mock()
+        self.assertEqual((await self.provider.check('unknown', self.fixture, self.local, {}))['status'], 'unsupported')
+        self.provider.store.rpc.assert_not_called()
+        self.assertEqual(len(self.calls), 4)
 
     async def test_sheet_restart_and_reuse(self):
         result = await self.check()

@@ -2719,8 +2719,14 @@ Implemented locally. The owned round pitch in Lineup and Classification shares o
 
 ## Announced La Liga club lineups · 2026-11-26
 
-Implemented and checked locally. A dedicated external factual resource reuses scoped calendar, catalog, roster and team-sheet observations for current-round badges. Its SQL deadline affects only the external team-sheet job. The current-round manual-action preflight remains authoritative for both kickoff locks. The cadence migration was applied and verified in production. Live acceptance requires the updated worker, the Dokploy key and an announced La Liga fixture. [Implementation](lineup_module.md#announced-la-liga-starting-elevens) · [Validation](data_review_results.md#la-liga-club-lineup-checker--2026-11-26)
+Implemented and checked locally. A dedicated external factual resource reuses scoped calendar, catalog, roster and team-sheet observations for current-round badges. Its SQL deadline affects only the external team-sheet job. The current-round manual-action preflight remains authoritative for both kickoff locks. The cadence migration was applied and verified in production. Live acceptance requires the updated worker, the Dokploy key and an announced La Liga fixture. [Implementation](lineup_module.md#announced-club-starting-elevens) · [Validation](data_review_results.md#la-liga-club-lineup-checker--2026-11-26)
 
 ### Manual check activation · 2026-11-26
 
 The user replaced scheduled provider polling with an explicit per-fixture button. Production migration `20261127045106_manual_club_lineup_checks` parks the external checker between requests. Both pitch views read saved observations. Provider calls require a single-use request for the selected round, fixture and kickoff. [Verification](data_review_results.md#manual-club-lineup-checks--2026-11-26)
+
+### Fixture retries and monthly credits · 2026-11-26
+
+Production migration `20261127050858_club_lineup_fixture_limits` enforces two attempts per account and game across sessions. The worker reserves each uncached request against a 500-credit ceiling shared across accounts for any 31 days. A user-reported two-credit standings call was entered once in production. [Implementation](lineup_module.md#announced-club-starting-elevens)
+
+Production migration `20261127051417_verified_club_lineup_leagues` binds manual permits to the verified membership competition. The published Futmondo catalog and provider endpoint parameters establish mappings for La Liga, the English Premier League and Italian Serie A. Unknown competitions make zero provider requests.

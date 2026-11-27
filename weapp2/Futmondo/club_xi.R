@@ -5,8 +5,10 @@ club_xi_supported <- function(competition,coverage) {
   "ready"
 }
 
+club_xi_competitions <- names(jsonlite::fromJSON("www/club-lineup-leagues.json"))
+
 club_xi_display_coverage <- function() {
-  if(nzchar(Sys.getenv("STRIKER_API_KEY")))"504e4f584d8bec9a67000079" else "not_configured"
+  if(nzchar(Sys.getenv("STRIKER_API_KEY")))paste(club_xi_competitions,collapse=",") else "not_configured"
 }
 
 get_club_lineups <- function(login,championship_id,manual_only=FALSE) {
@@ -57,6 +59,8 @@ club_xi_collect <- function(fixtures, prior, context, now, saved, fetch, request
   f <- fixtures[i,,drop=FALSE];id <- f$match_id
   m <- as.list(f[c("match_id","round_id","home_id","away_id","home_name","away_name","kickoff")])
   m$unix <- unix[i]
+  m$checks <- request$checks
+  m$retry_at <- request$retry_at
   teams <- c(f$home_id,f$away_id)
   players <- if(is.data.frame(roster)&&all(c("id","name","teamId")%in%names(roster)))
     roster[roster$teamId %in% teams,intersect(c("id","name","slug","teamId","number","dob"),names(roster)),drop=FALSE]
@@ -142,7 +146,7 @@ club_xi_label <- function(feed, player, fixtures, now=Sys.time()) {
   text <- switch(m$status,outside_window="Kickoff reached",pending="Club XI not announced yet",catalog_pending="Waiting for club roster",
     fixture_unmatched="Fixture match unconfirmed",incomplete="Team sheet incomplete",
     confirmed="Club XI awaiting update",rate_limited="Lineup provider rate limited",
-    credits_exhausted="Lineup provider credits exhausted",access_denied="Lineup provider access denied","Club XI unavailable")
+    monthly_limit="Monthly lineup allowance reached",credits_exhausted="Lineup provider credits exhausted",access_denied="Lineup provider access denied","Club XI unavailable")
   list(text=text,warning=FALSE,title=if(is.finite(observed))paste(text,"· Last observed",fm_format_datetime(observed))else text)
 }
 
@@ -161,7 +165,7 @@ club_xi_source <- function(session,active,login,championship,scope) {
   })
 }
 
-club_xi_checkable <- function(feed,players,fixtures,now=Sys.time()) {
+club_xi_checkable <- function(feed,players,fixtures,now=Sys.time(),holds=list()) {
   if(!mvp_text(feed$status) %in% c("ready","calendar_pending")||!NROW(fixtures))return(fixtures[0,,drop=FALSE])
   clubs <- vapply(players,function(p)mvp_text(p$teamId),character(1))
   kick <- as.numeric(fm_time(fixtures$kickoff))
@@ -175,7 +179,17 @@ club_xi_checkable <- function(feed,players,fixtures,now=Sys.time()) {
     !(lineup_match_same_fixture(m,rows[i,,drop=FALSE]) && identical(m$status,"confirmed") &&
       all(ids %in% names(m$players)))
   },logical(1))
-  rows[keep,,drop=FALSE]
+  rows <- rows[keep,,drop=FALSE]
+  rows$available_at <- vapply(seq_len(nrow(rows)),function(i){
+    row <- rows[i,,drop=FALSE]
+    m <- feed$matches[[row$match_id]]
+    hold <- holds[[row$match_id]]
+    local <- if(identical(hold$kickoff,row$kickoff))hold$until %||% 0 else 0
+    if(!lineup_match_same_fixture(m,row))return(local)
+    if(fm_number(m$checks,0)>=2)return(Inf)
+    max(local,fm_number(m$retry_at,0))
+  },numeric(1))
+  rows
 }
 
 club_xi_request <- function(s,fixture,owner) {

@@ -18,7 +18,21 @@ const {PGlite} = require('@electric-sql/pglite');
     assert.equal(await parked(),true);
     await q("update worker_jobs set due_at=now() where resource_key=$1",[d.resource_key]);
     assert.equal(await parked(),true);
-    const request=async(match='match')=>(await q("select worker_request_club_lineup('acct',$1,$2,'round',(now()+interval '20 minutes')::text) as status",[d,match])).status;
+    const kickoff=new Date(Date.now()+20*60000).toISOString();
+    const early=new Date(Date.now()+60*60000).toISOString();
+    const request=async(match='match',target=d,when=kickoff)=>(await q(
+      "select worker_request_club_lineup('acct',$1,$2,'round',$3) as status",[target,match,when])).status;
+    // An account may manage several competitions. Only its actual, verified source ID is admitted.
+    const coverage=JSON.parse(fs.readFileSync('www/club-lineup-leagues.json','utf8'));
+    const leagues={};
+    for (const id of [...Object.keys(coverage),'unmapped']) leagues[id]={competition_id:id,season:'2026',scoring_version:'stats'};
+    await q("update worker_accounts set verified_leagues=verified_leagues || $1::jsonb where account_id='acct'",[leagues]);
+    for(const [i,id] of Object.keys(leagues).entries()){
+      const scoped={...d,resource_key:String(i+1).repeat(64),args:{...d.args,championship_id:id},
+        context:{...scope,championship_id:id,competition_id:id}};
+      assert.equal(await request('shared-fixture',scoped), coverage[id]?'requested':'unavailable');
+      if(id!==comp) assert.equal(await request('spoof', {...scoped,context:{...scoped.context,competition_id:comp}}),'unavailable');
+    }
     assert.equal(await request(),'requested');
     assert.equal(await request(),'busy');
     assert.equal(await parked(),false);
@@ -34,7 +48,38 @@ const {PGlite} = require('@electric-sql/pglite');
     await q("update worker_club_lineup_requests set requested_at=now()-interval '4 minutes'");
     await q("update worker_jobs set due_at=now() where resource_key=$1",[d.resource_key]);
     assert.equal(await parked(),true);
+    // A different fixture and an alternate resource cannot reset the original game's budget.
+    const other={...d,resource_key:'b'.repeat(64)};
+    assert.match(await request('match',other),/^retry_at:/);
+    await q("update worker_club_lineup_limits set last_check=now()-interval '16 minutes' where match_id='match'");
+    assert.equal(await request(),'requested');
+    assert.equal(await request('match',other),'busy');
+    await q("update worker_jobs set owner='test:1',lease_until=now()+interval '1 minute' where resource_key=$1",[d.resource_key]);
+    assert.equal((await take('test:1')).checks,2);
+    assert.equal(await request('match',other),'limit_reached');
+    assert.equal(await request(),'limit_reached');
+    // An expired, unconsumed request never uses a check.
+    assert.equal((await q("select checks from worker_club_lineup_limits where match_id='another'")).checks,0);
+    assert.equal(await request('early',d,early),'requested');
+    assert.equal((await take('test:1')).checks,1);
+    await q("update worker_club_lineup_limits set last_check=now()-interval '16 minutes' where match_id='early'");
+    const allowed=Number((await request('early',other,early)).split(':')[1]);
+    assert.equal(allowed,Math.ceil(Date.parse(early)/1000)-1800);
+    assert.equal((await q("select has_table_privilege('authenticated','worker_club_lineup_limits','SELECT') as can_read")).can_read,false);
     assert.equal((await q("select has_function_privilege('authenticated','worker_request_club_lineup(text,jsonb,text,text,text)','EXECUTE') as browser")).browser,false);
+    // Model 498 previously spent credits. Only a two-credit endpoint can still be dispatched.
+    await q("insert into striker_credit_reservations(endpoint,credits) values('prior_usage',498)");
+    const reserve=async(endpoint)=>(await q('select worker_reserve_striker_call($1) as id',[endpoint])).id;
+    assert.equal(await reserve('get_lineups'),null);
+    const lastTwo=await reserve('list_games');
+    assert.ok(lastTwo);
+    assert.equal(await reserve('get_squad'),null);
+    await q('select worker_settle_striker_call($1,0)',[lastTwo]);
+    assert.ok(await reserve('get_squad'));
+    await q("update striker_credit_reservations set reserved_at=now()-interval '32 days' where endpoint='prior_usage'");
+    assert.ok(await reserve('get_lineups'));
+    assert.equal((await q("select has_function_privilege('authenticated','worker_reserve_striker_call(text)','execute') as allowed")).allowed,false);
+    console.log('PASS two fixture checks, late retry, cross-resource cooldown and global rolling allowance');
     console.log('PASS existing jobs parked, refresh inert, explicit wake, generation and lease guard, single consumption, duplicate click, expiry and restricted role');
   }finally{await db.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

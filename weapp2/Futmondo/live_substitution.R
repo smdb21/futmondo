@@ -267,10 +267,10 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
       button <- function(kind,label,...)live_sub_button(session$ns,event(kind,...),label)
       feed <- club_sheet()
       round_fixtures <- fixtures()
-      eligible_fixtures <- club_xi_checkable(feed,o$lineup$players,round_fixtures)
+      eligible_fixtures <- club_xi_checkable(feed,o$lineup$players,round_fixtures,holds=state$xi_holds)
       if(identical(feed$status,"ready")){
         starts <- as.numeric(fm_time(round_fixtures$kickoff))-5400
-        remaining <- starts-as.numeric(Sys.time())
+        remaining <- c(starts,eligible_fixtures$available_at)-as.numeric(Sys.time())
         later_windows <- remaining[is.finite(remaining)&remaining>0]
         if(length(later_windows))shiny::invalidateLater(min(86400000,ceiling(min(later_windows)*1000)),session)
       }
@@ -311,7 +311,13 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
           "Club team sheets · Check a fixture within 90 minutes of kickoff.")),
         if(nrow(eligible_fixtures))shiny::div(class="fm-club-xi-checks",lapply(seq_len(nrow(eligible_fixtures)),function(i){
           f <- eligible_fixtures[i,,drop=FALSE]
-          button("club_xi",paste0("Check club XI · ",f$home_name," vs ",f$away_name),fixture=f$match_id)
+          label <- paste0("Check club XI · ",f$home_name," vs ",f$away_name)
+          if(f$available_at>as.numeric(Sys.time())){
+            reason <- if(f$available_at>=as.numeric(fm_time(f$kickoff)))"No more checks before kickoff" else
+              paste("Available",fm_format_datetime(f$available_at))
+            return(shiny::tags$button(type="button",class="btn btn-default",disabled="disabled",paste(label,"·",reason)))
+          }
+          button("club_xi",label,fixture=f$match_id)
         })),
         if(identical(state$xi_note$key,s$key) &&
            !isTRUE(feed$matches[[state$xi_note$fixture]]$checked>=state$xi_note$at))
@@ -327,9 +333,9 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
       state <- live_sub_round_state(root,s$key)
       if(identical(e$kind,"club_xi")){
         feed <- club_sheet()
-        rows <- club_xi_checkable(feed,options()$lineup$players,fixtures())
+        rows <- club_xi_checkable(feed,options()$lineup$players,fixtures(),holds=state$xi_holds)
         f <- rows[rows$match_id %in% e$fixture,,drop=FALSE]
-        if(nrow(f)!=1L || isTRUE(state$xi_submitting))return()
+        if(nrow(f)!=1L || f$available_at>as.numeric(Sys.time()) || isTRUE(state$xi_submitting))return()
         state$xi_submitting <- TRUE
         at <- as.numeric(Sys.time())
         update <- function(message)state$xi_note <- list(key=s$key,fixture=f$match_id,at=at,message=message)
@@ -337,7 +343,18 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
         request <- tryCatch(club_xi_request(s,f,session$token),error=promises::promise_reject)
         promises::then(request,function(status){
           state$xi_submitting <- FALSE
-          update(switch(mvp_text(status),requested="Club XI check requested.",
+          status <- mvp_text(status)
+          until <- switch(status,limit_reached=Inf,requested=at+180,busy=at+180,0)
+          if(startsWith(status,"retry_at:")){
+            until <- fm_number(sub("^retry_at:","",status),0)
+            status <- "retry_later"
+          }
+          holds <- shiny::isolate(state$xi_holds) %||% list()
+          holds[[f$match_id]] <- list(kickoff=f$kickoff,until=until)
+          state$xi_holds <- holds
+          update(switch(status,limit_reached="Both checks for this fixture have been used.",
+            retry_later=paste("The next check is available",fm_format_datetime(until)),
+            requested="Club XI check requested.",
             busy="A check was requested recently. Allow a moment for the saved result.",
             outside_window="This fixture is outside the pre-kickoff window.","Club XI check unavailable."))
           NULL

@@ -293,7 +293,8 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         job = dict(self.job,descriptor=d,resource_key=d['resource_key'])
         fixture = dict(match_id='fixture',round_id='round',kickoff=stamp(time.time()+600),unix=time.time()+600)
         request = {k:fixture[k] for k in ('match_id','round_id','kickoff')}
-        permits = [request,request,None]
+        request['competition_id'] = d['context']['competition_id']
+        permits = [request, dict(request,competition_id='foreign'), request, None]
         rpc = self.store.rpc
         async def respond(name,**params):
             if name=='take_club_lineup':
@@ -309,6 +310,9 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         await exchange(dict(type='club_xi_request'))
         with self.assertRaisesRegex(WorkerFailure,'source_route_denied'):
             await exchange(dict(read,fixture=dict(fixture,match_id='other')))
+        await exchange(dict(type='club_xi_request'))
+        with self.assertRaisesRegex(WorkerFailure,'source_route_denied'):
+            await exchange(read)
         check.assert_not_awaited()
         await exchange(dict(type='club_xi_request'))
         self.assertEqual((await exchange(read))['status'],'confirmed')

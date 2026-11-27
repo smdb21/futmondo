@@ -21,6 +21,10 @@ if("--wire" %in% commandArgs(TRUE)){
     request=request,rounds=fm_worker_encode(rounds),catalog=fm_worker_encode(roster)),auto_unbox=TRUE,na="null",null="null",digits=NA)))
   quit(save="no")
 }
+coverage <- paste(club_xi_competitions,collapse=",")
+stopifnot(all(vapply(club_xi_competitions,function(id)club_xi_supported(id,coverage)=="ready",logical(1))),
+  club_xi_supported("52026a62737b88c93700009e",coverage)=="unsupported",
+  NROW(club_xi_checkable(list(status="unsupported"),list(),fixtures,now))==0L)
 reads <- character()
 saved <- function(fn,args,context){
   reads <<- c(reads,fn)
@@ -43,6 +47,16 @@ result <- collect()
 stopifnot(identical(reads,"get_championship_players"),checks==1,
   identical(badge(result)$text,"On club bench"),badge(result)$warning,badge(result,"f13")$warning,
   !badge(result,"f1")$warning,!badge(result,"missing")$warning,badge(result,clock=now+1600)$warning)
+# The two pitches use the persisted count and deadline; older snapshots retain their existing buttons.
+pending <- result
+pending$matches$fixture$status <- "pending"
+available <- function(feed,holds=list())club_xi_checkable(feed,list(player("f12")),fixtures,now,holds)$available_at
+stopifnot(available(pending)==0)
+pending$matches$fixture$checks <- 1
+pending$matches$fixture$retry_at <- as.numeric(now)+900
+stopifnot(available(pending)==as.numeric(now)+900)
+pending$matches$fixture$checks <- 2
+stopifnot(is.infinite(available(pending)), !length(available(result)))
 restore <- function(x)fm_worker_decode(jsonlite::fromJSON(fm_worker_json(fm_worker_encode(x)),simplifyVector=FALSE))
 settled <- result
 settled$matches$fixture$unresolved <- list()

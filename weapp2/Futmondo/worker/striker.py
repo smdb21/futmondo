@@ -1,4 +1,4 @@
-"""Read announced La Liga team sheets using the StrikerAPI free-plan endpoints."""
+"""Read announced team sheets for verified Futmondo leagues using the StrikerAPI free-plan endpoints."""
 import asyncio
 import json
 import re
@@ -6,10 +6,11 @@ import time
 import unicodedata
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
-LALIGA = '504e4f584d8bec9a67000079'
+LEAGUES = json.loads((Path(__file__).resolve().parents[1] / 'www/club-lineup-leagues.json').read_text())
 BASE = 'https://mcp.strikerapi.com/v1/'
 
 
@@ -117,16 +118,23 @@ def sheet_rows(data, game):
 
 
 class Striker:
-    def __init__(self, client, key):
+    def __init__(self, client, key, store):
         self.client = client
         self.key = key
+        self.store = store
         self.cache = OrderedDict()
         self.lock = asyncio.Lock()
+        self.pending_settlement = None
         self.retry_at = 0
         self.retry_status = 'rate_limited'
 
-    async def read(self, endpoint, args, ttl):
-        key = (endpoint, tuple(sorted(args.items())))
+    async def settle(self):
+        reservation, used = self.pending_settlement
+        await self.store.rpc('settle_striker_call', p_id=reservation, p_used=used)
+        self.pending_settlement = None
+
+    async def read(self, league, endpoint, args, ttl):
+        key = (league, endpoint, tuple(sorted(args.items())))
         async with self.lock:
             now = time.time()
             cached = self.cache.get(key)
@@ -134,8 +142,22 @@ class Striker:
                 return cached[1], cached[0]
             if now < self.retry_at:
                 raise FeedError(self.retry_status)
-            async with self.client.stream('POST', BASE+endpoint, json=dict(league='laliga',**args),
+            if self.pending_settlement:
+                await self.settle()
+            reservation = await self.store.rpc('reserve_striker_call', p_endpoint=endpoint)
+            if not reservation:
+                raise FeedError('monthly_limit')
+            async with self.client.stream('POST', BASE+endpoint, json=dict(league=league,**args),
                     headers={'x-api-key':self.key}, follow_redirects=False, timeout=5) as response:
+                used = response.headers.get('x-credits-used', '')
+                expected = 5 if endpoint == 'get_lineups' else 2
+                if used.isascii() and used.isdigit() and int(used) != expected:
+                    self.pending_settlement = (reservation, int(used))
+                    try:
+                        await self.settle()
+                    except Exception:
+                        # Keep the original reservation. Retry this adjustment before another paid read.
+                        pass
                 if response.status_code in (401,402,403,429):
                     self.retry_status = {401:'access_denied',402:'credits_exhausted',403:'access_denied',
                                          429:'rate_limited'}[response.status_code]
@@ -162,11 +184,12 @@ class Striker:
             return data, now
 
     async def check(self, competition, fixture, local, clubs):
-        if not self.key or competition!=LALIGA:
+        league = LEAGUES.get(competition)
+        if not self.key or not league:
             return {'status':'not_configured' if not self.key else 'unsupported'}
         progress = {}
         try:
-            return await asyncio.wait_for(self._check(fixture,local,clubs,progress),20)
+            return await asyncio.wait_for(self._check(league,fixture,local,clubs,progress),20)
         except FeedError as error:
             return dict(progress,status=error.args[0])
         except (httpx.HTTPError,asyncio.TimeoutError):
@@ -174,11 +197,11 @@ class Striker:
         except (KeyError,TypeError,ValueError,AttributeError):
             return dict(progress,status='incomplete')
 
-    async def _check(self, fixture, local, clubs, progress):
+    async def _check(self, league, fixture, local, clubs, progress):
         fid = fixture.get('fixture_id')
         if not fid:
             date = datetime.fromtimestamp(fixture['unix'],timezone.utc).date().isoformat()
-            schedule,_ = await self.read('list_games',{'date':date},1800)
+            schedule,_ = await self.read(league,'list_games',{'date':date},1800)
             matches = [g for g in schedule['games'] if same_fixture(g,fixture,clubs)]
             if len(matches)!=1:
                 raise FeedError('fixture_unmatched')
@@ -186,7 +209,7 @@ class Striker:
         progress['fixture_id'] = identifier(fid)
         evidence = fixture.get('evidence')
         if not evidence:
-            data,observed = await self.read('get_lineups',{'game_id':fid},3*3600)
+            data,observed = await self.read(league,'get_lineups',{'game_id':fid},3*3600)
             game = data['game']
             if game['game_id']!=fid or not same_fixture(game,fixture,clubs):
                 raise FeedError('fixture_unmatched')
@@ -196,7 +219,7 @@ class Striker:
             try:
                 sheets = sheet_rows(data, game)
             except (FeedError, KeyError, TypeError, ValueError):
-                self.cache.pop(('get_lineups', (('game_id', fid),)), None)
+                self.cache.pop((league, 'get_lineups', (('game_id', fid),)), None)
                 raise
             evidence = dict(observed=observed,season=game['season'],teams={
                 s:identifier(game[s]['team_id']) for s in ('home','away')},rows=sheets)
@@ -211,7 +234,7 @@ class Striker:
                 prior = {}
             roster,checked = prior.get('roster') or [], prior.get('checked') or 0
             if not roster or time.time()-checked>=7*86400:
-                squad,checked = await self.read('get_squad',{'team':tid},7*86400)
+                squad,checked = await self.read(league,'get_squad',{'team':tid},7*86400)
                 entries = squad['players']
                 if (squad['team_id']!=tid or squad['season']!=season or not entries or
                         len(entries)!=squad['count']):
