@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Award player cards (2026-11-27)
+
+Classification and Round awards open the existing player card from individual award winners. Local implementation and offline browser verification are complete. [Navigation behavior](round_mvps_module.md#player-card-navigation-2026-11-27) · [Verification](data_review_results.md#award-player-cards-2026-11-27)
+
 ## Trends round range slider (2026-11-27)
 
 Trends → Points uses one two-handle slider for the published round interval in both Points and Ranks. [Slider behavior](plots_module.md#points-and-ranks-2026-11-26)

@@ -62,7 +62,7 @@ round_award_card <- function(mvp, xi, players = NULL) {
     tags$div(class = "round-mvp-round", if (is.finite(mvp$round_number))
       paste("Round", format(mvp$round_number, trim = TRUE, scientific = FALSE)) else "Round number unavailable"),
     if(nrow(xi) && any(xi$is_finished %in% FALSE)) tags$div(class = "round-mvp-meta", "Provisional selection"),
-    tags$div(class = "round-mvp-player", tags$span(class = "round-mvp-badge", "MVP"), " ", mvp$player_name),
+    tags$div(class = "round-mvp-player", tags$span(class = "round-mvp-badge", "MVP"), " ", award_player_button(mvp$player_id, mvp$player_name)),
     tags$div(class = "round-mvp-meta", if (is.finite(mvp$points))
       paste(format(mvp$points, trim = TRUE), "points") else "Points unavailable"),
     tags$h4(class = "round-best-xi-title", "Best XI"),
@@ -74,7 +74,7 @@ round_award_card <- function(mvp, xi, players = NULL) {
           position_class <- unname(position_classes[position])
           tags$tr(class = if (xi$is_mvp[i]) "round-best-xi-mvp",
             tags$td(if (is.na(position_class)) position else tags$span(class = position_class, position)),
-            tags$td(name_cell(xi$player_name[i], i), if (xi$is_mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))),
+            tags$td(award_player_button(xi$player_id[i], name_cell(xi$player_name[i], i)), if (xi$is_mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))),
             tags$td(if (is.finite(xi$points[i])) format(xi$points[i], trim = TRUE) else "Unavailable"))
         }))))
 }
@@ -131,7 +131,7 @@ round_award_chart_name <- function(player, name_column) {
     if (nzchar(player$crest)) tags$img(class = "fm-team-crest", src = player$crest, alt = if (name_column == "club") "" else player$club,
       title = player$club, width = 22, height = 22, loading = "lazy", decoding = "async",
       onerror = "this.style.display='none';"),
-    tags$span(class = "award-player-details", tags$span(player[[name_column]]),
+    tags$span(class = "award-player-details", award_player_button(player$player_id, player[[name_column]]),
       if (length(player$position)) tags$small(class = "award-position", `data-position` = player$position,
         title = player$position_title, player$position)))
 }
@@ -144,7 +144,9 @@ round_award_name_cell <- htmlwidgets::JS("function(cell) {
     title: row.club, width: 22, height: 22, loading: 'lazy', decoding: 'async',
     onError: function(event) { event.currentTarget.style.display = 'none'; }});
   return el('span', {className: 'award-player'}, crest,
-    el('span', {className: 'award-player-details'}, el('span', null, cell.value),
+    el('span', {className: 'award-player-details'}, row.player_id
+      ? el('button', {type: 'button', className: 'fm-award-player-link', 'data-award-player': row.player_id}, cell.value)
+      : el('span', null, cell.value),
       row.position && el('small', {className: 'award-position', 'data-position': row.position, title: row.position_title}, row.position)));
 }")
 
@@ -243,7 +245,7 @@ round_award_statistics_view <- function(stats, snapshot, catalog = NULL, club_st
       metric(stats$rounds, "Confirmed rounds"), metric(nrow(winners), xi_label), metric(sum(winners$mvp > 0L), mvp_label)),
     notice, round_award_catalog_notice(catalog, if (by_club) "Club details" else "Player team crests"))
   if (!nrow(winners)) return(summary)
-  identity_columns <- setdiff(c("crest", "club", "position", "position_title"), name_column)
+  identity_columns <- setdiff(c("player_id", "crest", "club", "position", "position_title"), name_column)
   hidden <- intersect(identity_columns, names(winners))
   columns <- c(setNames(list(reactable::colDef(name = if (by_club) "Club" else "Player",
       minWidth = 95, cell = round_award_name_cell)), name_column),
@@ -283,7 +285,7 @@ round_mvps_UI <- function(id) {
         uiOutput(ns("mvp_cards"))))))
 }
 
-round_mvps_Server <- function(id, is_module_active, login_token, championship_id, refresh_trigger = NULL) {
+round_mvps_Server <- function(id, is_module_active, login_token, championship_id, refresh_trigger = NULL, user_team_id = function() NULL) {
   moduleServer(id, function(input, output, session) {
     player_catalog_read <- factual_read_adapter(session, "get_championship_players", login_token,
       championship_id, is_active = is_module_active, refresh_trigger = refresh_trigger, state_only = TRUE)
@@ -293,6 +295,12 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
       if (valid_login(auth)) player_catalog_read(auth, championship_id())
     })
     award_stats <- reactive(round_award_player_stats(mvp_snapshot()$rows, championship_id()))
+    card_links <- award_player_cards(session, is_module_active, login_token, championship_id, user_team_id, refresh_trigger,
+      find_name = function(id) {
+        rows <- mvp_snapshot()$rows
+        if ("championship_id" %in% names(rows)) rows <- rows[rows$championship_id %in% championship_id(), , drop = FALSE]
+        rows$player_name[match(id, rows$player_id)]
+      }, catalog = player_catalog)
     club_view <- reactive({
       appearances <- award_stats()$appearances
       clubs <- round_award_club_stats(appearances)
@@ -317,7 +325,7 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
       players <- stats$players
       catalog <- if (anyNA(players$award_positions) || any(!nzchar(round_award_crest_urls(unique(players$award_logo)))))
         player_catalog()
-      round_award_statistics_view(stats, snapshot, catalog)
+      card_links(round_award_statistics_view(stats, snapshot, catalog))
     })
     output$mvp_cards <- renderUI({
       snapshot <- mvp_snapshot()
@@ -331,10 +339,10 @@ round_mvps_Server <- function(id, is_module_active, login_token, championship_id
         return(notice %||% fm_info("Round awards are unavailable; the reason could not be determined.", error = TRUE))
       }
       catalog <- player_catalog()
-      tagList(notice, round_award_catalog_notice(catalog), tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {
+      card_links(tagList(notice, round_award_catalog_notice(catalog), tags$div(class = "round-mvps-grid", lapply(seq_len(nrow(rows)), function(i) {
         row <- rows[i, , drop = FALSE]
         round_award_card(row, round_best_xi_rows(snapshot$rows, championship_id(), row), catalog$data)
-      })))
+      }))))
     })
   })
 }

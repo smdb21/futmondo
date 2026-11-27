@@ -616,7 +616,7 @@ players_in_championship_Server(id = "players_in_championship",
                     }),
                     login_token = login_token_RV,
                     championship_id = championship_id_RV,
-                    refresh_trigger = refresh_trigger)
+                    refresh_trigger = refresh_trigger, user_team_id = user_team_id_RV)
 
   admin_Server(id = "admin",
                is_module_active = reactive({

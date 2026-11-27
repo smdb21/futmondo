@@ -389,7 +389,7 @@ classification_dreamteam_table <- function(players) {
             if (nzchar(crest)) tags$img(class = "fm-team-crest", src = crest, width = 22, height = 22,
               alt = players$team[i], title = if (nzchar(players$team[i])) players$team[i],
               loading = "lazy", decoding = "async"),
-            tags$span(players$player[i])
+            award_player_button(players$player_id[i], players$player[i])
           ),
           if (players$mvp[i]) tagList(" ", tags$span(class = "round-mvp-badge", "MVP"))
         ),
@@ -1008,20 +1008,31 @@ classification_Server <- function(id, is_module_active, login_token, championshi
         }
       )
     })
+    dreamteam_state <- reactive({
+      req(is_module_active(), single_round_RV() != "all")
+      if (is.function(refresh_trigger)) refresh_trigger()
+      catalog <- rounds_RV()
+      index <- match(as.numeric(single_round_RV()), catalog$round_number)
+      if (is.na(index)) return(NULL)
+      classification_read_state(function() get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]))
+    })
+    dreamteam_players <- reactive(classification_dreamteam_rows(dreamteam_state()$data))
+    card_catalog <- factual_read_adapter(session, "get_championship_players", login_token, championship_id,
+      is_active = is_module_active, refresh_trigger = refresh_trigger, state_only = TRUE)
+    card_links <- award_player_cards(session, is_module_active, login_token, championship_id, user_team_id, refresh_trigger,
+      find_name = function(id) {
+        players <- dreamteam_players()
+        players$player[match(id, players$player_id)]
+      }, catalog = function() card_catalog(login_token(), championship_id()))
     output$dreamteam_box_ui <- renderUI({
       req(is_module_active() == TRUE, login_token(), championship_id())
-      if (!is.null(refresh_trigger)) {
-        refresh_trigger()
-      }
       if (is.null(single_round_RV()) || single_round_RV() == "all") {
         return(p("Select one round to see its published dream team and MVP."))
       }
-      catalog <- rounds_RV()
-      index <- match(as.numeric(single_round_RV()), catalog$round_number)
-      if (is.na(index)) {
+      dreamteam <- dreamteam_state()
+      if (is.null(dreamteam)) {
         return(fm_info("Round identity unavailable.", error = TRUE))
       }
-      dreamteam <- classification_read_state(function() get_round_dreamteam(login_token(), championship_id(), catalog$round_id[index]))
       if (is.null(dreamteam$data)) {
         return(fm_info(if (isTRUE(dreamteam$loading)) {
           "Loading the published dream team…"
@@ -1029,11 +1040,11 @@ classification_Server <- function(id, is_module_active, login_token, championshi
           resource_failure_message(dreamteam$error)
         }, error = !isTRUE(dreamteam$loading),pending=isTRUE(dreamteam$loading)))
       }
-      players <- classification_dreamteam_rows(dreamteam$data)
+      players <- dreamteam_players()
       if (!nrow(players)) {
         return(fm_info("The dream team has not been published or is unavailable."))
       }
-      classification_dreamteam_table(players)
+      card_links(classification_dreamteam_table(players))
     })
   })
 }

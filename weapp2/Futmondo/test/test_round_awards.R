@@ -230,6 +230,50 @@ check('club statistics count each appearance at its recorded club and each repre
   shared_mvp_source <- original_source
   factual_read_adapter <- original_adapter
 })
+check('award clicks select a scoped ID, reuse the card, and retain historical players', {
+  original_card <- selected_player_Server
+  original_source <- shared_mvp_source
+  original_adapter <- factual_read_adapter
+  opened <- 0L
+  card_player <- NULL
+  selected_player_Server <- function(id, selected_player, ...) {
+    opened <<- opened + 1L
+    card_player <<- selected_player
+  }
+  saved <- transform(first, player_name = 'Shared name', persistence = 'Saved')
+  shared_mvp_source <- function(...) reactiveVal(list(rows = saved, reason = ''))
+  catalog <- reactiveVal(data.frame(id = c('p2', 'p1'), name = c('Second', 'First'), points = c(21, 20)))
+  factual_read_adapter <- function(...) function(...) list(data = catalog())
+  league <- reactiveVal('league')
+  shiny::testServer(round_mvps_Server, args = list(is_module_active = function() TRUE,
+    login_token = function() c(userid = 'fixture', token = 'synthetic'),
+    championship_id = league, user_team_id = function() 'team'), {
+    dom <- xml2::read_html(output$award_statistics$html)
+    scope <- xml2::xml_attr(xml2::xml_find_first(dom, '//*[@data-award-scope]'), 'data-award-scope')
+    click <- function(id) session$setInputs(award_open = list(scope = scope, id = id))
+    stopifnot(opened == 0L, !is.na(scope))
+    click('unknown')
+    stopifnot(opened == 0L)
+    click('p2')
+    stopifnot(opened == 1L, card_player()$id == 'p2', card_player()$name == 'Second', card_player()$points == 21)
+    session$setInputs(award_closed = 1L)
+    stopifnot(is.null(card_player()))
+    click('p2')
+    session$setInputs(award_closed = 1L)
+    stopifnot(opened == 1L, card_player()$id == 'p2')
+    click('p11')
+    stopifnot(card_player()$id == 'p11', card_player()$name == 'Shared name', is.null(card_player()$points))
+    catalog(data.frame(id = 'p11', name = 'Current name', points = 42))
+    stopifnot(card_player()$name == 'Current name', card_player()$points == 42)
+    league('other')
+    session$flushReact()
+    click('p2')
+    stopifnot(is.null(card_player()), opened == 1L)
+  })
+  selected_player_Server <- original_card
+  shared_mvp_source <- original_source
+  factual_read_adapter <- original_adapter
+})
 fixture <- tags$html(tags$head(tags$meta(name = 'viewport', content = 'width=device-width, initial-scale=1'),
   tags$style(HTML(paste(':root { --fm-muted: #aaa; --fm-border: #345; --fm-surface: #0b120d; --fm-text: #eee; --fm-warning: #ffc107; } body { margin: 0; padding: 16px; background: #050805; font-family: monospace; } * { box-sizing: border-box; }',
     paste(readLines('www/custom_style.css', warn = FALSE), collapse = '\n'))))),

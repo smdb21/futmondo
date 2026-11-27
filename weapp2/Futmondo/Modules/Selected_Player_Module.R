@@ -226,6 +226,67 @@ player_card_offer_button <- function(player, team, ns) {
   NULL
 }
 
+# Award rows carry round points and historical clubs. Only use their ID and
+# name to open a card. Current player facts come from the saved catalog.
+award_player_button <- function(id, name) {
+  if (!nzchar(fm_scalar(id, ""))) return(name)
+  tags$button(type = "button", class = "fm-award-player-link", `data-award-player` = id, name)
+}
+
+award_player_cards <- function(session, is_active, login, championship, team, refresh, find_name, catalog) {
+  scope <- reactive({
+    if (!isTRUE(is_active()) || !valid_login(login()) || !nzchar(fm_scalar(team(), ""))) return(NULL)
+    league_context_revision()
+    paste(openssl::sha256(serialize(resource_context(login(), championship(), team()), NULL)))
+  })
+  selection <- reactiveVal(NULL)
+  selected <- reactive({
+    target <- selection()
+    if (is.null(target) || !identical(scope(), target$scope)) return(NULL)
+    players <- catalog()$data
+    i <- match(target$id, as.character(players$id))
+    if (!is.na(i)) return(translate_player_positions(players[i, , drop = FALSE]))
+    row <- data.frame(id = target$id, name = target$name)
+    attr(row, "award_identity_only") <- TRUE
+    row
+  })
+
+  started <- FALSE
+  generation <- 0L
+  observeEvent(session$input$award_open, {
+    click <- session$input$award_open
+    req(is.list(click), !is.null(scope()), identical(click$scope, scope()),
+      is.character(click$id), length(click$id) == 1L, nzchar(click$id))
+    name <- find_name(click$id)
+    req(length(name) == 1L, !is.na(name))
+    if (!started) {
+      selected_player_Server("award_card", selected, login, championship, team, refresh_trigger = refresh,
+        on_bid_updated = function(...) if (is.function(refresh)) refresh(isolate(refresh()) + 1L))
+      started <<- TRUE
+    }
+    generation <<- generation + 1L
+    selection(list(id = click$id, name = name, scope = scope()))
+    showModal(modalDialog(selected_player_UI(session$ns("award_card")),
+      tags$script(HTML(sprintf(
+        "$(document).one('hidden.bs.modal', '#shiny-modal', function(){Shiny.setInputValue('%s', %d, {priority:'event'});});",
+        session$ns("award_closed"), generation))),
+      size = "l", easyClose = TRUE, footer = modalButton("Close")), session = session)
+  })
+  observeEvent(session$input$award_closed, {
+    if (isTRUE(session$input$award_closed == generation)) selection(NULL)
+  })
+  observeEvent(scope(), {
+    target <- selection()
+    if (!is.null(target) && !identical(scope(), target$scope)) selection(NULL)
+  }, ignoreNULL = FALSE)
+
+  function(content) {
+    tags$div(`data-award-input` = session$ns("award_open"), `data-award-scope` = scope(),
+      onclick = "const b = event.target.closest('button[data-award-player]'); if (b) Shiny.setInputValue(this.dataset.awardInput, {id:b.dataset.awardPlayer, scope:this.dataset.awardScope}, {priority:'event'});",
+      content)
+  }
+}
+
 selected_player_UI <- function(id, player = NULL, team = NULL) {
   ns <- NS(id)
   tagList(
@@ -785,7 +846,9 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
         # The own-listings snapshot can confirm a listing absent from the table row.
         display_row <- sp
         if (is_own_player) display_row$market_inMarket <- is_listed_on_market
-        location <- player_card_location_label(display_row, current_user_team)
+        location <- if (isTRUE(attr(sp, "award_identity_only")) && !isTRUE(attr(sp, "availability_complete"))) {
+          "Current ownership and market status unavailable"
+        } else player_card_location_label(display_row, current_user_team)
         if (is_own_player && is_listed_on_market && is.finite(current_asking_price))
           location <- paste0(location, " · Asking ", player_card_money(current_asking_price))
         action_buttons <- tagList(p(class = "player-card-status", location), action_buttons)

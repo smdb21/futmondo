@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Award player cards (2026-11-27)
+
+Chromium opened the standard card from Classification, both player leader charts, the sorted and searched winners table, the by-round MVP heading and the Best XI at 390 and 1440 px. The synthetic fixture covered keyboard input, repeat clicks, two players sharing a name, and a winner absent from the current catalog. Grouping by club exposed zero player controls. Eleven round-award checks passed, including stale league and close events, along with the Classification loading, Best XI crest and database-backed award display suites. The offline Shiny lifecycle passed 14 checks and eight tabs. Hosted behavior was not tested.
+
+The browser sends one scoped event per activation. Rendering the links creates no per-player observers, schedules no timers and adds no API or database reads. The first valid click starts one reusable card server for that module and reuses saved catalog and card detail observations. Across three paired local runs, rendering 38 complete round cards (418 XI entries plus 38 MVP headings) took a median 0.765 seconds with buttons and 0.688 seconds before. The ranking table renders buttons only for its current page.
+
 ## Trends round range slider (2026-11-27)
 
 The slider projects the saved round list in kickoff order. Dragging updates the endpoint labels in the browser. Releasing a handle sends its round interval to the existing chart projection. The control introduces no runtime dependency, polling or acquisition.
