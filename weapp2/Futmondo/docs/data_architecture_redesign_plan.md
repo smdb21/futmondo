@@ -28,7 +28,7 @@
 
 - [x] Group the active outgoing offer count and total under Balance, and label daily player value changes and pending arrivals and departures under Squad size. Reuse the shared offer and clause-transfer observations.
 
-- [x] Display the Home kickoff label and localized timestamp side by side. Label the countdown below with its purpose and duration units, and identify the saved schedule in the freshness warning.
+- [x] Display the Home kickoff label and localized timestamp side by side. Label the countdown below with its purpose and duration units. Omit the saved-schedule notice from the Round card.
 
 ## Advanced and resumed rounds (2026-11-26)
 

@@ -196,8 +196,7 @@ async function verify(browser, width, theme) {
     await round.getByText('Round 11', {exact:true}).waitFor();
     await round.locator('.fm-browser-countdown').waitFor();
     assert.match(await round.innerText(), /\bClosed\b/);
-    await round.getByText('Showing the saved schedule. Round status and kickoff times may have changed.',
-      {exact:true}).waitFor();
+    assert.doesNotMatch(await round.innerText(), /saved schedule|may have changed|out of date/i);
     const kickoff = round.locator('.fm-home-kickoff');
     const label = kickoff.getByText('Round 12 kickoff', {exact:true});
     const timestamp = kickoff.getByText(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} \S+$/);

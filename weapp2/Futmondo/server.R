@@ -327,7 +327,7 @@ function(input, output, session) {
       list(status = if (waiting) "loading" else "unavailable")
     })
   }
-  home_observation <- function(state, value = NULL, detail = NULL, stale_message = "May be out of date") {
+  home_observation <- function(state, value = NULL, detail = NULL, show_stale_notice = TRUE) {
     incomplete <- isTRUE(state$status %in% c("partial", "unavailable")) ||
       any(attr(state$data, "fetch_status") %in% c("partial", "unavailable")) ||
       any(attr(state$data, "worker_completeness") %in% c("partial", "incomplete", "unavailable")) ||
@@ -337,7 +337,7 @@ function(input, output, session) {
     stale <- identical(state$freshness, "stale") || identical(state$status, "stale") ||
       identical(attr(state$data, "fetch_status"), "stale") || !is.null(state$error)
     tags$div(tags$strong(value), if (!is.null(detail)) tags$small(detail),
-      if (stale) tags$small(stale_message))
+      if (show_stale_notice && stale) tags$small("May be out of date"))
   }
   # Calendar updates and navigation can replace a deadline well before kickoff.
   home_round_tick <- reactiveVal(NULL)
@@ -375,7 +375,7 @@ function(input, output, session) {
     headline <- if (is.null(current)) upcoming else current
     home_observation(state, paste("Round", headline$round_number),
       tagList(if (is.null(current)) "Upcoming" else current$status, kickoff),
-      stale_message = "Showing the saved schedule. Round status and kickoff times may have changed.")
+      show_stale_notice = FALSE)
   })
   home_roster_state <- reactive({
     req(home_visible())

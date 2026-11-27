@@ -131,7 +131,6 @@ html:not(.fm-signed-in) .fm-theme-options:not([hidden]) {
   #home_round small { text-align: start; }
   #home_round small:has(> .fm-home-kickoff) { display: contents; }
   #home_round .fm-home-kickoff { grid-column: 1 / -1; }
-  #home_round small + small { grid-column: 1 / -1; }
   .fm-home-caption { font-size: 11px; margin-bottom: 3px; }
   .fm-home-caption i { display: none; }
 }

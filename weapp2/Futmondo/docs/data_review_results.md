@@ -18,7 +18,7 @@ My Team offer checks passed (10), durable offer persistence checks passed (8), a
 
 ## Round schedule wording (2026-11-26)
 
-The Home browser fixture uses a stale saved calendar. Chromium displayed the closed round, the next round’s kickoff with its timezone, a separate “Time until kickoff” row with duration units, and a warning that round status and kickoff times may have changed. The rows fit at 320, 390 and 1440 px. The fresh calendar fixture omitted the warning.
+The Home browser fixture uses a stale saved calendar. Chromium displayed the closed round, the next round’s kickoff with its timezone, a separate “Time until kickoff” row with duration units, and no freshness notice. The rows fit at 320, 390 and 1440 px. Returning Home reused the overview reads at each width. The fresh calendar and unavailable calendar checks also passed.
 
 The labels reuse the existing calendar read and browser clock. Ten unrelated inputs caused zero additional reads. The change adds no requests, database writes, reactive timers or per-tick server work. All four Home fixture groups, the 14 debt and countdown checks and the offline lifecycle (14 checks and eight tabs) passed locally. [Home fixtures](../test/test_welcome_primary_loading.R) · [Browser check](../test/test_welcome_home_browser.cjs)
 
