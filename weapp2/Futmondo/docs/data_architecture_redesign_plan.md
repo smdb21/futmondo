@@ -2,7 +2,7 @@
 
 ## Incoming transfers on Home (2026-11-26)
 
-Implemented locally. Home displays “Loading…” for incoming transfers until the shared transfer check settles. [Home display behavior](page_preferences.md)
+Implemented locally. Home tracks incoming and leaving transfers independently, including the first database read of the player summaries needed for each direction. [Home display behavior](page_preferences.md)
 
 ## Points from a selected round (2026-11-26)
 

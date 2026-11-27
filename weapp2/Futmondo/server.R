@@ -432,8 +432,10 @@ function(input, output, session) {
       NA_integer_
     }
     list(incoming = count(transfers$status, transfers$records),
-      incoming_loading = isTRUE(transfers$status %in% c("loading", "refreshing")),
-      leaving = count(transfers$outgoing_status, transfers$outgoing_records))
+      incoming_loading = isTRUE(transfers$incoming_loading) || transfers$status %in% c("loading", "refreshing"),
+      leaving = count(transfers$outgoing_status, transfers$outgoing_records),
+      leaving_loading = isTRUE(transfers$outgoing_loading) ||
+        (transfers$outgoing_status %||% transfers$status) %in% c("loading", "refreshing"))
   })
   output$home_squad <- renderUI({
     req(home_visible())
@@ -453,8 +455,10 @@ function(input, output, session) {
         team_trend_counts(home_squad_summary(), show_count_labels = TRUE)),
       tags$div(class = "fm-home-detail", tags$span("Transfers"),
         tags$div(class = "fm-team-trend-counts",
-          team_direction_count("up", transfers$incoming, "Incoming players", "incoming", loading = transfers$incoming_loading),
-          team_direction_count("down", transfers$leaving, "Leaving players", "leaving"))))
+          team_direction_count("up", transfers$incoming, "Incoming players", "incoming",
+            missing_label = if (transfers$incoming_loading) "Loading…" else "Unavailable"),
+          team_direction_count("down", transfers$leaving, "Leaving players", "leaving",
+            missing_label = if (transfers$leaving_loading) "Loading…" else "Unavailable"))))
   })
   notifications <- notifications_Server("notifications", reactive(input$tabs == "notifications"),
     login_token_RV, championship_id_RV, user_team_id_RV, user_teams_RV, refresh_trigger,

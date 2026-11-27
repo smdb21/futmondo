@@ -4,7 +4,7 @@ fm_worker_configured<-function()TRUE
 clear_api_cache();auth<-c(userid='passive-clause',token='synthetic')
 ctx<-resource_context(auth,'league','mine','player')
 d<-fm_worker_descriptor('get_clause_transfer_summary',list(championship_id='league',user_team_id='mine',player_id='player'),ctx)
-s<-fm_worker_account_state(ctx$account_id);s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active')
+s<-fm_worker_account_state(ctx$account_id);s$bootstrap_complete<-TRUE;s$known<-TRUE;s$account<-list(enabled=TRUE,auth_status='active')
 active<-TRUE;live<-function()active;attr(live,'fm_worker_interest')<-'clause-display'
 fm_worker_demand(d,'fixture',live)
 value<-observed_data(list(data=list(id='player'),championship=list(owner=list(id='seller'),clause=list(transferred=TRUE,transferDate='2026-11-20T10:00:00Z'))),observed_at=Sys.time()-310)

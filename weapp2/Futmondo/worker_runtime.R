@@ -130,7 +130,8 @@ fm_worker_demand<-function(descriptor,owner='',is_current=NULL){
  interest<-if(is.function(is_current))attr(is_current,'fm_worker_interest') %||% paste0('live:',owner)else paste0('legacy:',owner)
  watchers[[interest]]<-list(owner=owner,current=is_current,at=now)
  if(length(watchers)>128L){old<-order(vapply(watchers,`[[`,numeric(1),'at'));watchers[old[seq_len(length(watchers)-128L)]]<-NULL}
- s$descriptors[[key]]<-list(descriptor=descriptor,at=now,owner=owner,watchers=watchers)
+ entry<-s$descriptors[[key]]
+ s$descriptors[[key]]<-list(descriptor=descriptor,at=now,owner=owner,watchers=watchers,read_complete=entry$read_complete)
  if(length(s$descriptors)>128L){times<-vapply(s$descriptors,function(x)x$at,numeric(1));victims<-names(sort(times))[seq_len(length(times)-128L)];s$descriptors[victims]<-NULL;s$queued[victims]<-NULL;s$errors[victims]<-NULL
   for(v in victims)if(exists(v,s$resource_revisions,inherits=FALSE))rm(list=v,envir=s$resource_revisions)
  }
@@ -287,6 +288,19 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
  if(!length(versions))versions<-structure(list(),names=character())
  descriptors<-setNames(lapply(keys,function(k)s$descriptors[[k]]$descriptor),keys)
  if(!length(descriptors))descriptors<-structure(list(),names=character())
+ # Derived transfer summaries have no independent acquisition job. A first
+ # completed database lookup distinguishes an absent projection from a pending read.
+ finish_clause_reads<-function(){
+  if(bootstrap)return()
+  for(key in read_keys){
+   entry<-s$descriptors[[key]]
+   if(!identical(entry$descriptor$handler,'get_clause_transfer_summary')||isTRUE(entry$read_complete))next
+   s$descriptors[[key]]$read_complete<-TRUE
+   if(is.null(fm_worker_get(account,key))){
+    revision<-fm_worker_resource_revision(s,key);revision(shiny::isolate(revision())+1L)
+   }
+  }
+ }
  p<-tryCatch(fm_worker_rpc(if(bootstrap)'bootstrap'else'read',if(bootstrap)list(p_account=account)else list(p_account=account,p_versions=versions,p_descriptors=descriptors),owner),error=promises::promise_reject)
  p<-promises::then(p,function(result){
   if(!is.list(result)||!all(c('account','resources','jobs')%in%names(result)))stop('Invalid database read response')
@@ -334,12 +348,14 @@ fm_worker_poll<-function(account,owner='',force=FALSE){
    }
   }
   # Polling is read-only: stale/missing observations never alter worker jobs.
+  finish_clause_reads()
   fm_worker_settle(s,if(!bootstrap)read_keys else character());fm_worker_notify(account)
   if(length(setdiff(fm_worker_live_keys(s),s$requested_keys)))fm_worker_schedule_read(account,owner)
   NULL
  },function(error){
   if(!identical(.fm_worker$accounts[[account]],s))return(NULL)
   s$busy<-FALSE;s$service_error<-'Saved data could not be read from the database.'
+  finish_clause_reads()
   for(w in s$bootstrap_waiters)w$reject(error);s$bootstrap_waiters<-list()
   for(id in names(s$waiters)){
    w<-s$waiters[[id]];s$waiters[[id]]<-NULL;if(is.function(w$cancel))w$cancel();w$reject(error)

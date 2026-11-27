@@ -89,12 +89,12 @@ team_value_summary <- function(team_state, roster_state) {
     down = if (is.null(changes)) NA_integer_ else sum(changes < 0))
 }
 
-team_direction_count <- function(direction, count, label, count_label = NULL, loading = FALSE) {
+team_direction_count <- function(direction, count, label, count_label = NULL, missing_label = NULL) {
   tags$div(class = paste0("fm-team-trend-", direction), title = label,
     icon(paste0("arrow-", direction)),
     tags$span(class = "sr-only", paste0(label, " ")),
-    if (loading) "Loading…" else if (is.na(count)) tagList(tags$span(class = "sr-only", "Unavailable"),
-      tags$span(`aria-hidden` = "true", "—")) else count,
+    if (is.na(count)) missing_label %||% tagList(
+      tags$span(class = "sr-only", "Unavailable"), tags$span(`aria-hidden` = "true", "—")) else count,
     if (!is.null(count_label)) tags$span(`aria-hidden` = "true", count_label))
 }
 
@@ -712,7 +712,7 @@ get_ordinal_position <- function(position) {
 
 # Page-scoped queue: at most two summary reads, with the same account-scoped
 # raw cache used by cards/preflight. Navigation never starts whole-league work.
-incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='',context=NULL,allow_observed=FALSE) {
+incoming_clause_cached_summary <- function(login,championship_id,user_team_id,player_id,is_current=NULL,owner='',context=NULL,allow_observed=FALSE,on_pending=NULL) {
   context<-context %||% resource_context(login,championship_id,user_team_id,player_id)
   key<-api_cache_key(paste0("player_summary_",login[["userid"]],"_",championship_id,"_",user_team_id,"_",player_id),context=context)
   item<-api_cache_env[[key]]
@@ -722,11 +722,16 @@ incoming_clause_cached_summary <- function(login,championship_id,user_team_id,pl
      as.numeric(difftime(now,stamp,units="secs"))<resource_policy("summary")$ttl)item$data else
        cached_clause_transfer_summary(context)
   if(exists("fm_worker_configured",mode="function")&&fm_worker_configured()) {
-    d<-fm_worker_descriptor("get_clause_transfer_summary",list(championship_id=championship_id,user_team_id=user_team_id,player_id=player_id),context)
+    args<-list(championship_id=championship_id,user_team_id=user_team_id,player_id=player_id)
+    read_context<-if(any(!vapply(context[c("competition_id","season","scoring_version")],fm_context_known,logical(1))))
+      fm_worker_resolve_context("get_clause_transfer_summary",args,context) else context
+    d<-fm_worker_descriptor("get_clause_transfer_summary",args,read_context)
     s<-fm_worker_account_state(context$account_id)
     if(is.function(is_current))fm_worker_demand(d,owner,is_current)
     try(fm_worker_resource_revision(s,d$resource_key)(),silent=TRUE)
     saved<-fm_worker_get(context$account_id,d$resource_key)$data
+    if(is.null(saved)&&is.null(value)&&is.function(on_pending)&&!isTRUE(s$descriptors[[d$resource_key]]$read_complete))
+      on_pending(player_id)
     stamp<-fm_time(attr(saved,"observed_at"));previous<-fm_time(attr(value,"observed_at"))
     historical<-isTRUE(allow_observed)&&isTRUE(attr(saved,"worker_acquisition_status")%in%c("ok","empty"))&&is.null(attr(saved,"fetch_error"))
     if(!is.null(saved)&&((resource_snapshot_unexpired(saved,now)&&!acquisition_data_unverified(saved))||historical)&&
@@ -817,6 +822,8 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
       incomplete_out<-identical(result$observed_outgoing_status,"partial")
       state(list(status=if(any(nzchar(rows$timing_error)))"partial"else"observed",records=rows,
         outgoing_status=if(incomplete_out||any(nzchar(leaving$timing_error)))"partial"else"observed",
+        incoming_loading=any(rows$player_id %in% snapshot$pending_summary_ids),
+        outgoing_loading=any(snapshot$pending_summary_ids %in% snapshot$roster$id),
         outgoing_records=leaving,observations_only=TRUE,source_times=snapshot$source_times,error=NULL,
         outgoing_error=if(incomplete_out&&!any(nzchar(leaving$timing_error)))
           "Saved departure details are incomplete: a player's owner or pending clause details could not be retrieved."else NULL))
@@ -916,10 +923,13 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
         display_live<-local({version<-generation;function()!closed&&was_active&&identical(generation,version)})
         attr(display_live,"fm_worker_interest")<-"clause-display"
         ids<-unique(as.character(observed_candidates$player_id));summaries<<-summaries[intersect(names(summaries),ids)]
+        pending_ids<-character()
+        pending<-function(pid)pending_ids<<-c(pending_ids,pid)
         for(pid in ids){
-          cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token,summary_context(captured,pid),allow_observed=TRUE)
+          cached<-incoming_clause_cached_summary(auth,context$league,context$team,pid,display_live,session$token,summary_context(captured,pid),allow_observed=TRUE,on_pending=pending)
           if(!is.null(cached))summaries[[pid]]<<-cached
         }
+        captured$pending_summary_ids<-setdiff(pending_ids,names(summaries))
         prerequisite_problem<<-NULL;snapshot<<-captured;publish(FALSE);return()
       }
     }
@@ -933,6 +943,8 @@ incoming_clause_source <- function(session,login_token,championship_id,user_team
       initial_loading<-loading&&is.null(snapshot)
       state(list(status=if(initial_loading)"loading"else "partial",records=previous$records,
         outgoing_status=if(initial_loading)"loading"else "partial",outgoing_records=previous$outgoing_records,
+        incoming_loading=loading&&!context_mismatch&&!length(problem$failures),
+        outgoing_loading=loading&&!context_mismatch&&!length(problem$failures),
         error=if(initial_loading)NULL else problem$message,source_errors=if(initial_loading)list()else problem$failures,
         observations_only=isTRUE(snapshot$observed_only),source_times=snapshot$source_times))
       return()

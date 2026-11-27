@@ -40,17 +40,18 @@ incoming_clause_cached_summary <- function(login, championship_id, user_team_id,
     owner=list(id=if(player_id=="p1") "team1" else "team2"),
     clause=list(transferred=TRUE, transferDate=format(Sys.time()+86400,"%Y-%m-%dT%H:%M:%SZ",tz="UTC")))))
 }
-incoming_text <- function(html) {
-  node <- xml2::xml_find_first(xml2::read_html(html), '//*[@title="Incoming players"]')
+transfer_text <- function(html, label) {
+  node <- xml2::xml_find_first(xml2::read_html(html), sprintf('//*[@title="%s"]', label))
   trimws(gsub('[[:space:]]+', ' ', xml2::xml_text(node)))
 }
 clear_api_cache()
 shiny::testServer(app_server,{
  login_fixture(session)
- stopifnot(grepl('Loading… incoming$', incoming_text(output$home_squad$html)), grepl('17 players', output$home_squad$html),
-   !grepl('Unavailable|—', incoming_text(output$home_squad$html)))
+ stopifnot(grepl('Loading… incoming$', transfer_text(output$home_squad$html, 'Incoming players')), grepl('17 players', output$home_squad$html),
+   grepl('Loading… leaving$', transfer_text(output$home_squad$html, 'Leaving players')),
+   !grepl('Unavailable|—', transfer_text(output$home_squad$html, 'Incoming players')))
  resolve_history(get_championship_pressroom());app_settle(session)
- stopifnot(grepl('1 incoming$', incoming_text(output$home_squad$html)), !grepl('Loading', incoming_text(output$home_squad$html)))
+ stopifnot(grepl('1 incoming$', transfer_text(output$home_squad$html, 'Incoming players')), !grepl('Loading', transfer_text(output$home_squad$html, 'Incoming players')))
  stopifnot(valid_login(login_token_RV()),startup_stage()=='ready',is.null(output$startup_status),
   grepl('Round 12',output$home_round$html),grepl('fm-browser-countdown',output$home_round$html),
   grepl('Time until kickoff', output$home_round$html, fixed=TRUE),
@@ -105,7 +106,7 @@ app_roster$change[1] <- NA_real_
 shiny::testServer(app_server,{
  login_fixture(session);stopifnot(startup_stage()=='ready', length(pending)==1L,
    grepl('Loading…', output$home_balance$html,fixed=TRUE),
-   grepl('0 incoming$', incoming_text(output$home_squad$html)),
+   grepl('0 incoming$', transfer_text(output$home_squad$html, 'Incoming players')),
    home_transfer_counts()$leaving == 0L)
  balance <- xml2::read_html(output$home_balance$html)
  stopifnot(grepl('0 €', output$home_balance$html, fixed=TRUE),
@@ -136,7 +137,10 @@ shiny::testServer(app_server,{
  login_fixture(session)
  stopifnot(startup_stage()=='empty', grepl('Unavailable',output$home_balance$html),
   grepl('Unavailable',output$home_squad$html), grepl('Unavailable',output$home_round$html),
-  grepl('Unavailable', incoming_text(output$home_squad$html), fixed=TRUE),
+  grepl('Unavailable incoming$', transfer_text(output$home_squad$html, 'Incoming players')),
+  grepl('Unavailable leaving$', transfer_text(output$home_squad$html, 'Leaving players')),
+  !grepl('—', paste(transfer_text(output$home_squad$html, 'Incoming players'),
+    transfer_text(output$home_squad$html, 'Leaving players'))),
   !grepl('data-fm-page="admin"',output$home_destinations$html))
  cat('PASS an account without a playable league keeps Home navigation and shows truthful empty metrics\n')
 })

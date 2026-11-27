@@ -30,6 +30,7 @@ cat('PASS expired successful worker summaries remain historical observations wit
 roster_state<-resource_state(roster);roster_state$context<-scope
 history_state<-resource_state(history);history_state$context<-scope
 factual_read_adapter<-function(session,handler,...)if(handler=='get_players_from_team')function(...)roster_state else function(...)history_state
+real_cached_summary<-incoming_clause_cached_summary
 incoming_clause_cached_summary<-function(login,championship_id,user_team_id,player_id,...)summaries[[player_id]]
 source_reads<-0L;async_adapter_fetch<-function(...){source_reads<<-source_reads+1L;stop('No source acquisition is allowed from stale display prerequisites')}
 settle<-function(session)for(i in 1:20){later::run_now(0);session$flushReact()}
@@ -46,3 +47,47 @@ for(reload in 1:2)shiny::testServer(function(input,output,session){
    !grepl('Transactions observed:',out_html,fixed=TRUE),!grepl('Refresh to retry',html,fixed=TRUE))
 })
 cat('PASS two cold page sessions restore stored transfer details as dated observations without false failure warnings, known dates and zero new source reads\n')
+
+# The stored roster and transactions can arrive in an earlier batch than the
+# derived player summaries. Exercise the real worker read and its per-key revisions.
+incoming_clause_cached_summary<-real_cached_summary
+fm_worker_configured<-function()TRUE
+worker<-fm_worker_account_state(scope$account_id)
+worker$bootstrap_complete<-TRUE
+worker$account<-list(enabled=TRUE)
+batches<-0L
+fm_worker_rpc<-function(name,payload,owner=''){
+ stopifnot(name=='read')
+ batches<<-batches+1L
+ promises::promise(function(resolve,reject){finish_read<<-resolve})
+}
+shiny::testServer(function(input,output,session){
+ state<-incoming_clause_source(session,function()auth,function()'league',function()'mine',function()TRUE)
+},{
+ settle(session)
+ stopifnot(state()$incoming_loading,state()$outgoing_loading)
+ if(!worker$busy)fm_worker_poll(scope$account_id,force=TRUE)
+ stopifnot(batches==1L)
+ # This database response contains only the departure. A missing arrival is
+ # now settled, and a later stored arrival must still invalidate the count.
+ saved<-function(id){
+   d<-fm_worker_descriptor('get_clause_transfer_summary',
+     list(championship_id='league',user_team_id='mine',player_id=id),scope)
+   wire<-charToRaw(fm_worker_json(fm_worker_encode(summaries[[id]])))
+   compressed<-history_baseline_compress(wire)
+   manifest<-list(account_id=scope$account_id,resource_key=d$resource_key,context=d$context,handler=d$handler,
+     version='v1',json_bytes=length(wire),parts=1L,sha256=paste0(openssl::sha256(compressed)),
+     observed_at=rival_finance_stamp(now-5),checked_at=rival_finance_stamp(now-5),
+     valid_until=rival_finance_stamp(now+295),status='ok',completeness='complete')
+   list(key=d$resource_key,manifest=manifest,chunks=list(jsonlite::base64_enc(compressed)))
+ }
+ reply<-function(id)list(account=worker$account,resources=list(saved(id)),jobs=list())
+ finish_read(reply('out'));settle(session)
+ stopifnot(!state()$incoming_loading,state()$status=='partial',
+   !state()$outgoing_loading,state()$outgoing_status=='observed',nrow(state()$outgoing_records)==1L)
+ fm_worker_poll(scope$account_id,force=TRUE)
+ finish_read(reply('in'));settle(session)
+ stopifnot(state()$status=='observed',!state()$incoming_loading,nrow(state()$records)==1L,
+   source_reads==0L,batches==2L)
+})
+cat('PASS pending summary batch, settled missing arrival and subsequent stored arrival with zero source reads\n')

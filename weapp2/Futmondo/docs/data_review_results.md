@@ -4,6 +4,10 @@
 
 The offline Home fixture held the transfer history response open. The incoming row showed “Loading…” while the squad size was visible, then showed one incoming player when the response arrived. A completed empty history showed zero. The fixture used one roster read and one transfer history read. Ten unrelated inputs added no reads. The label reuses the existing reactive display and adds no timer, database work or source request.
 
+The deployed server and transfer module fingerprints matched the initial fix when the remaining dashes were reported. The first fix covered pending transfer history only on the incoming side. In the saved-data fixture, the roster and history were ready before the player summaries. The transfer source had already published a partial result during that database read.
+
+The follow-up checks held one batched database read for both players, returned only a verified departure, then delivered the arrival on the next read. Each direction settled independently with zero Futmondo source requests. Home also showed visible “Unavailable” text for both directions in an account without a playable league. The database reader tracks the first completed lookup on the existing bounded descriptors and uses per-resource notifications. The change adds no requests or timers. Offline Chromium showed both loading labels at 320 and 1440 px and both zero counts after the held history read completed. The Shiny lifecycle passed 14 checks and eight tabs.
+
 ## Points from a selected round (2026-11-26)
 
 The chart previously filtered season totals after accumulation. In the offline browser fixture, choosing round 6.2 showed 0 before the round, 5 after it and 2 after the next round’s −3. A single-round interval showed both 0 and 5. Rank switching and restoring the season view passed in both themes at 320, 390 and 1440 px, with zero additional saved reads or horizontal overflow.
