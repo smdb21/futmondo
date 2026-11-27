@@ -59,6 +59,12 @@ testServer(selected_player_Server, args = list(selected_player = selected, login
     settle(session)
   }
   generation <- market_offer_dialog_RV()$generation
+  refresh_metadata <- function() {
+    .fm_league_contexts$revision(.fm_league_contexts$revision() + 1L)
+    settle(session)
+  }
+  refresh_metadata()
+  stopifnot(identical(market_offer_dialog_RV()$generation, generation))
   send(generation - 1L, 170)
   send(generation, -1)
   stopifnot(length(jobs) == 0L, length(rpc) == 0L)
@@ -67,6 +73,7 @@ testServer(selected_player_Server, args = list(selected_player = selected, login
   stopifnot(!length(jobs), !length(rpc))
   session_jobs <<- list()
   send(generation, 171, 2L)
+  refresh_metadata()
   send(generation, 172)
   stopifnot(identical(before, reads), length(jobs) == 1L, jobs[[1]]$payload$price == 171,
     offer_modal_opened_RV(), length(refreshes) == 0L)
@@ -97,6 +104,12 @@ testServer(selected_player_Server, args = list(selected_player = selected, login
   send(generation, 203)
   stopifnot(length(jobs) == 3L, is.null(market_offer_dialog_RV()))
   cat('PASS closing invalidates that confirmation generation\n')
+  session$setInputs(btn_offer_owner = 4L)
+  previous <- market_offer_dialog_RV()$generation
+  selected(transform(rival, id = 'different-player')); settle(session)
+  send(previous, 204)
+  stopifnot(length(jobs) == 3L, is.null(market_offer_dialog_RV()))
+  cat('PASS same-context refresh preserves an open or pending offer, switching players invalidates it\n')
 })
 
 reserved <- list(list(kind = "scheduled", state = "scheduled", player_id = "other", reserved_slot = 1, reserved_amount = 200))

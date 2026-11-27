@@ -9,7 +9,17 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       const page = await browser.newPage({viewport:{width, height:780}});
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
-      await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+      const offerScripts = [];
+      await page.route('**/*', route => {
+        const url = new URL(route.request().url());
+        if (url.hostname !== '127.0.0.1') return route.abort();
+        if (url.pathname.endsWith('/offer-dialog.js')) {
+          offerScripts.push(url.pathname);
+          // Another Shiny process may serve assets before it has opened an offer dialog.
+          if (url.pathname !== '/offer-dialog.js') return route.fulfill({status:404, body:''});
+        }
+        return route.continue();
+      });
       await page.goto('http://127.0.0.1:3895/');
       await page.waitForFunction(() => Shiny.shinyapp.isConnected());
       const modal = page.locator('#shiny-modal');
@@ -105,6 +115,7 @@ const { chromium } = require((process.env.FUTMONDO_TEST_NODE_MODULES || '/tmp/fu
       await open('Open market player', 'Make Market Offer', field);
       await page.keyboard.press('Escape');
       await modal.waitFor({state:'hidden'});
+      assert.deepEqual(offerScripts, ['/offer-dialog.js']);
       assert.deepEqual(errors, []);
       console.log('PASS ' + width + 'px: click-to-card, card-to-action and action-to-editor ' + [market,direct,clause].map(pair => pair.join('+')).join('/') + ' ms (market/owner/clause); spinner and locked controls remained visible during each delayed response');
       await page.close();

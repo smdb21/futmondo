@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Unresponsive offer submission (2026-11-26)
+
+Public reads against ligaradar.com returned HTTP 404 for `/fm-offer-dialog-2/offer-dialog.js` and served the expected JavaScript at `/offer-dialog.js`. In offline Chromium, reproducing the 404 left Submit Offer enabled with an empty status after a click. Separately, the server fixture reproduced a lost confirmation when a league metadata revision left the selected player and all context IDs unchanged.
+
+The corrected browser path loaded the script once per page at 320, 390 and 1440 px. Market and rival offers showed the pending state immediately and displayed the delayed simulated rejection or acceptance. The shared clause dialog also completed. The server test refreshed metadata before and during submission, dispatched exactly one request with the confirmed amount, and rejected a stale confirmation after switching players. The existing offer control checks and the offline Shiny lifecycle passed, including 14 lifecycle checks and eight tabs. Opening the cold editor took 20 ms in the server fixture and added zero source or database reads. The fix adds no polling or retries. All transaction checks used synthetic accounts. [Browser check](../test/test_player_offer_browser.cjs) and [server check](../test/test_market_offer_opening.R)
+
 ## Market bid editor (2026-11-26)
 
 Offline Chromium verified five buttons on one row at 320, 390 and 1440 px in light and dark themes. On a €150 listing, two +1% taps showed €152 (+1.33%) and €153 (+2%). Typing €180 immediately showed +20%, and +10% then showed €195 (+30%). The checks covered below-listing and below-valuation messages, clearing the field, cancellation and reopening. The longest observed Playwright click and preview check was 49 ms across these six runs.

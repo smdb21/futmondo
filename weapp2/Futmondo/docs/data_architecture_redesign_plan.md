@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Manual offer submission (2026-11-26)
+
+Implemented and tested locally. The offer button loads its handler from the shared static URL and retains its confirmation across same-context metadata refreshes. [Offer submission](bid_management.md#offer-submission)
+
 ## Market bid editor (2026-11-26)
 
 Implemented locally. New and existing market bids share cumulative percentage controls, live premium feedback and below-value warnings. [Bid editor behavior](bid_management.md#market-offer-percentage-buttons-2026-11-26)

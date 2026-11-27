@@ -1,5 +1,9 @@
 # Manual bid management
 
+## Offer submission
+
+The player card loads `offer-dialog.js` from the app’s static `www` directory when an offer editor first opens. The browser sends the displayed amount and confirmation generation together and keeps the controls locked while it waits for a response. A metadata refresh preserves the confirmation while its account, championship, team, player, competition, season and scoring version stay the same. Changing that context invalidates the confirmation.
+
 ## Market offer cancellation (2026-11-26)
 
 When a player card opens, `player_card_market_offer()` projects the selected player's outgoing offer from the same account, league and team market observation used by Today. A verified, saved offer is shown as the last recorded bid, including between worker updates. The existing finance ledger supplies the submitted amount immediately after an acknowledged market offer until a newer market observation arrives. Cancel Bid can then look up the native bid ID. A published listing with no own bid clears the display. An arbitrary player-table bid, a bid count or a pending request cannot establish ownership.

@@ -372,7 +372,8 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     observeEvent(player_action_context_RV(), {
       current_context <- player_action_context_RV()
       previous_context <- isolate(previous_player_action_context_RV())
-      if (!identical(current_context, previous_context)) action_context_generation <<- action_context_generation + 1L
+      if (identical(current_context, previous_context)) return()
+      action_context_generation <<- action_context_generation + 1L
       active_bid_info_RV(NULL);modal_context_RV(list());modal_bid_info_RV(list())
       market_offer_dialog_RV(NULL)
       submitting_offer <<- NULL
@@ -794,7 +795,7 @@ selected_player_Server <- function(id, selected_player, login_token = NULL, cham
     )
 
     offer_dialog_dependency <- htmltools::htmlDependency(
-      "fm-offer-dialog", "2", src = c(file = "www"), script = "offer-dialog.js")
+      "fm-offer-dialog", "2", src = c(href = "."), script = "offer-dialog.js")
     market_bid_editor <- function(id, label, amount, base, base_label, player_value, min, step = "any") {
       editor <- div(class = "fm-market-bid-editor",
         `data-base` = as.character(base), `data-base-label` = base_label,

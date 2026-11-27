@@ -48,4 +48,7 @@ server <- function(input, output, session) {
   observeEvent(input$open_rival, open(rival))
 
 }
-shiny::runApp(shiny::shinyApp(ui, server), host = '127.0.0.1', port = 3895, launch.browser = FALSE)
+# Match directory-based deployment, where every Shiny process serves www at the app root.
+app <- shiny::shinyApp(ui, server)
+app$staticPaths <- list("/" = httpuv::staticPath(normalizePath("www"), indexhtml = FALSE, fallthrough = TRUE))
+shiny::runApp(app, host = '127.0.0.1', port = 3895, launch.browser = FALSE)
