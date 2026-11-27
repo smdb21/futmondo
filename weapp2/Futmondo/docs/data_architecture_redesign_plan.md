@@ -2730,3 +2730,5 @@ The user replaced scheduled provider polling with an explicit per-fixture button
 Production migration `20261127050858_club_lineup_fixture_limits` enforces two attempts per account and game across sessions. The worker reserves each uncached request against a 500-credit ceiling shared across accounts for any 31 days. A user-reported two-credit standings call was entered once in production. [Implementation](lineup_module.md#announced-club-starting-elevens)
 
 Production migration `20261127051417_verified_club_lineup_leagues` binds manual permits to the verified membership competition. The published Futmondo catalog and provider endpoint parameters establish mappings for La Liga, the English Premier League and Italian Serie A. Unknown competitions make zero provider requests.
+
+An explicit unpublished XI releases its provider credit reservation and retains the per-user attempt and retry deadline. [Provider contract and verification](data_review_results.md#fixture-limits-and-verified-leagues--2026-11-26)

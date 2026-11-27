@@ -133,6 +133,14 @@ class Striker:
         await self.store.rpc('settle_striker_call', p_id=reservation, p_used=used)
         self.pending_settlement = None
 
+    async def adjust_charge(self, reservation, used):
+        self.pending_settlement = (reservation, used)
+        try:
+            await self.settle()
+        except Exception:
+            # Keep the original reservation and retry before the next paid read.
+            pass
+
     async def read(self, league, endpoint, args, ttl):
         key = (league, endpoint, tuple(sorted(args.items())))
         async with self.lock:
@@ -151,13 +159,9 @@ class Striker:
                     headers={'x-api-key':self.key}, follow_redirects=False, timeout=5) as response:
                 used = response.headers.get('x-credits-used', '')
                 expected = 5 if endpoint == 'get_lineups' else 2
-                if used.isascii() and used.isdigit() and int(used) != expected:
-                    self.pending_settlement = (reservation, int(used))
-                    try:
-                        await self.settle()
-                    except Exception:
-                        # Keep the original reservation. Retry this adjustment before another paid read.
-                        pass
+                charged = int(used) if used.isascii() and used.isdigit() else None
+                if charged is not None and charged != expected:
+                    await self.adjust_charge(reservation, charged)
                 if response.status_code in (401,402,403,429):
                     self.retry_status = {401:'access_denied',402:'credits_exhausted',403:'access_denied',
                                          429:'rate_limited'}[response.status_code]
@@ -175,8 +179,13 @@ class Striker:
             data = json.loads(content)['data']
             if not isinstance(data,dict):
                 raise FeedError('incomplete')
-            # An empty team sheet is eligible for retry on the following sweep.
-            duration = 120 if endpoint=='get_lineups' and not data.get('lineups') else ttl
+            # The published endpoint contract charges zero for an unpublished team sheet.
+            if endpoint == 'get_lineups' and not isinstance(data.get('lineups'), list):
+                raise FeedError('incomplete')
+            empty_sheet = endpoint == 'get_lineups' and data['lineups'] == []
+            if charged is None and empty_sheet:
+                await self.adjust_charge(reservation, 0)
+            duration = 120 if empty_sheet else ttl
             self.cache[key]=(now,data,duration)
             self.cache.move_to_end(key)
             while len(self.cache)>44:
@@ -210,6 +219,8 @@ class Striker:
         evidence = fixture.get('evidence')
         if not evidence:
             data,observed = await self.read(league,'get_lineups',{'game_id':fid},3*3600)
+            if data['lineups'] == [] and not data.get('game'):
+                raise FeedError('pending')
             game = data['game']
             if game['game_id']!=fid or not same_fixture(game,fixture,clubs):
                 raise FeedError('fixture_unmatched')

@@ -35,6 +35,7 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.headers = {}
         self.expected_league = "laliga"
         self.squad_outage = False
+        self.pending_note_only = False
         self.client = httpx.AsyncClient(transport=httpx.MockTransport(self.serve))
         self.provider = self.service()
 
@@ -61,7 +62,8 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
             body = dict(games=[self.game])
         elif endpoint=='get_lineups':
             self.assertEqual(args['game_id'],'42')
-            body = dict(game=self.game,lineups=self.sides,source='live')
+            body = (dict(lineups=[], note='Not yet announced') if self.pending_note_only else
+                    dict(game=self.game,lineups=self.sides,source='live'))
         else:
             self.assertEqual(endpoint,'get_squad')
             tid = args['team']
@@ -120,6 +122,16 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.provider.check('unknown', self.fixture, self.local, {}))['status'], 'unsupported')
         self.provider.store.rpc.assert_not_called()
         self.assertEqual(len(self.calls), 4)
+
+    async def test_unannounced_lineup_costs_zero(self):
+        self.pending_note_only = True
+        self.fixture['fixture_id'] = '42'
+        self.assertEqual((await self.check())['status'], 'pending')
+        self.assertEqual(self.calls, ['get_lineups'])
+        self.provider.store.rpc.assert_awaited_with('settle_striker_call', p_id='synthetic-reservation', p_used=0)
+        self.provider.store.rpc.reset_mock()
+        self.assertEqual((await self.check())['status'], 'pending')
+        self.provider.store.rpc.assert_not_called()
 
     async def test_sheet_restart_and_reuse(self):
         result = await self.check()
