@@ -12,12 +12,13 @@ games <- league_fixture_matches(list(list(`_id`="round",matches=list(list(`_id`=
 fixtures <- games$rows
 roster <- data.frame(id=c("f1","f12","f13","a1","who"),teamId=c("home","home","home","away","away"),
   name=c("Angel Garcia 1","Angel Garcia 12","Angel Garcia 13","Angel Garcia 1","unknown"),number=c(1,12,13,1,NA))
-args <- list(championship_id="league")
+args <- list(championship_id="league",manual_only=TRUE)
+request <- as.list(fixtures[1,c("match_id","round_id","kickoff")])
 rounds <- data.frame(round_id="round")
 attr(rounds,"fixture_calendar") <- list(matches=games,status="ok",scope=ctx)
 if("--wire" %in% commandArgs(TRUE)){
   cat(as.character(jsonlite::toJSON(list(descriptor=fm_worker_descriptor("get_club_lineups",args,ctx),
-    rounds=fm_worker_encode(rounds),catalog=fm_worker_encode(roster)),auto_unbox=TRUE,na="null",null="null",digits=NA)))
+    request=request,rounds=fm_worker_encode(rounds),catalog=fm_worker_encode(roster)),auto_unbox=TRUE,na="null",null="null",digits=NA)))
   quit(save="no")
 }
 reads <- character()
@@ -35,7 +36,7 @@ fetch <- function(m,players,clubs){
     clubs=list(home=list(team_id=1,season_id=77,links=list(f12=112))),unresolved=list("who"))
 }
 collect <- function(prior=NULL,clock=now,rows=fixtures,check=fetch)
-  club_xi_collect(rows,prior,ctx,clock,saved,check)
+  club_xi_collect(rows,prior,ctx,clock,saved,check,request)
 player <- function(id)list(id=id,teamId="home")
 badge <- function(f,id="f12",clock=now)club_xi_label(f,player(id),fixtures,clock)
 result <- collect()
@@ -43,8 +44,11 @@ stopifnot(identical(reads,"get_championship_players"),checks==1,
   identical(badge(result)$text,"On club bench"),badge(result)$warning,badge(result,"f13")$warning,
   !badge(result,"f1")$warning,!badge(result,"missing")$warning,badge(result,clock=now+1600)$warning)
 restore <- function(x)fm_worker_decode(jsonlite::fromJSON(fm_worker_json(fm_worker_encode(x)),simplifyVector=FALSE))
-replayed <- collect(restore(result),now+90)
-stopifnot(isTRUE(all.equal(replayed$matches,result$matches)),checks==1,length(reads)==1,abs(replayed$next_check-as.numeric(now)-180)<0.001)
+settled <- result
+settled$matches$fixture$unresolved <- list()
+replayed <- collect(restore(settled),now+90)
+stopifnot(isTRUE(all.equal(replayed$matches,settled$matches)),checks==1,length(reads)==1)
+replayed <- restore(result)
 retry <- collect(replayed,now+181)
 stopifnot(checks==2,length(reads)==3,retry$profiles$who$number==33)
 outage <- collect(retry,now+365,check=function(...)list(status="unavailable"))

@@ -30,6 +30,7 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         self.local.append(dict(id='unknown',teamId='home',name='unmapped'))
         self.calls = []
         self.code = 200
+        self.squad_outage = False
         self.client = httpx.AsyncClient(transport=httpx.MockTransport(self.serve))
         self.provider = self.service()
 
@@ -58,6 +59,8 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         else:
             self.assertEqual(endpoint,'get_squad')
             tid = args['team']
+            if tid=='2' and self.squad_outage:
+                return httpx.Response(503)
             body = dict(team_id=tid,season=2026,count=13,players=[player(int(tid),i) for i in range(1,14)])
         return httpx.Response(self.code,json=dict(data=body))
 
@@ -80,6 +83,19 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         with patch('worker.striker.time.time',return_value=self.fixture['unix']-500):
             self.assertEqual((await self.check(result['clubs']))['players']['12'],'benched')
         self.assertEqual(len(self.calls),4)
+
+    async def test_partial_squad_reused_on_manual_retry(self):
+        self.squad_outage = True
+        first = await self.check()
+        self.assertEqual(first['status'], 'unavailable')
+        self.assertEqual(set(first['clubs']), {'home'})
+        self.fixture.update(evidence=first['evidence'], fixture_id=first['fixture_id'])
+        self.provider = self.service()
+        self.squad_outage = False
+        self.calls.clear()
+        result = await self.check(first['clubs'])
+        self.assertEqual(result['players']['13'], 'absent')
+        self.assertEqual(self.calls, ['get_squad'])
 
     async def test_confirmation_identity_and_failures(self):
         self.sides, original = [], self.sides
@@ -106,6 +122,8 @@ class ClubSheets(unittest.IsolatedAsyncioTestCase):
         descriptor = wire['descriptor']
         latest = None
         async def exchange(message):
+            if message['type'] == 'club_xi_request':
+                return dict(request=wire['request'] if latest is None else None)
             if message['type'] == 'discovery_resource':
                 handler = message['descriptor']['handler']
                 self.assertIn(handler, ('get_club_lineups','get_championship_players','get_finished_rounds'))

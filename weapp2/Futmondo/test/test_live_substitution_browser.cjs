@@ -15,6 +15,9 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
       await live.locator('.fm-lineup-layout').waitFor();
       assert.ok(await live.evaluate(n=>n.scrollWidth <= n.clientWidth+1));
       if(width===390){
+        assert.equal((await page.locator('#xi_checks').innerText()).trim(),'0');
+        await live.getByRole('button',{name:'Check club XI · one vs other'}).click();
+        await page.waitForFunction(()=>document.querySelector('#xi_checks').textContent.trim()==='1');
         await live.getByText('On club bench',{exact:true}).waitFor();
         await live.getByRole('button',{name:'Substitute Forward'}).click();
         await live.getByRole('button',{name:'Reserve',exact:true}).click();
@@ -48,6 +51,7 @@ const { chromium } = require(path.join(process.env.FUTMONDO_TEST_NODE_MODULES ||
         assert.match(await page.locator('#counts').innerText(),/^9 2 3 /);
       }
       console.log('PASS',width,'px, both views, source reads/writes/store attempts/DB reads',await page.locator('#counts').innerText());
+      assert.equal((await page.locator('#xi_checks').innerText()).trim(),'1');
       await page.close();
     }
   } finally { await browser.close(); }

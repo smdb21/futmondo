@@ -193,11 +193,17 @@ class Striker:
             if not data.get('lineups') or (observed<fixture['unix'] and data.get('source')!='live') or (
                     data.get('source') in ('predicted','projected','expected')):
                 raise FeedError('pending')
+            try:
+                sheets = sheet_rows(data, game)
+            except (FeedError, KeyError, TypeError, ValueError):
+                self.cache.pop(('get_lineups', (('game_id', fid),)), None)
+                raise
             evidence = dict(observed=observed,season=game['season'],teams={
-                s:identifier(game[s]['team_id']) for s in ('home','away')},rows=sheet_rows(data,game))
+                s:identifier(game[s]['team_id']) for s in ('home','away')},rows=sheets)
         progress.update(evidence=evidence,observed=evidence['observed'])
         season = evidence['season']
         updated, verdicts, unresolved = {}, {}, []
+        progress['clubs'] = updated
         for side,tid in evidence['teams'].items():
             cid = fixture[side+'_id']
             prior = clubs.get(cid) or {}

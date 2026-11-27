@@ -454,7 +454,7 @@ class Helper:
                     safe_diagnostic = isinstance(code, str) and (code in diagnostic_codes or re.fullmatch(
                         r'resource_parse_(?:http|network|parser|schema|read_budget|unknown)_(?:' + resources + r')(?:_[1-5][0-9]{2})?', code, flags=re.ASCII))
                     raise WorkerFailure(code if safe_timeout or safe_diagnostic else 'resource_parse')
-                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack', 'clause_observation', 'club_xi'):
+                if message.get('type') not in ('http', 'database', 'persist', 'resource', 'discovery_resource', 'progress', 'history_ack', 'clause_observation', 'club_xi_request', 'club_xi'):
                     raise WorkerFailure('helper_protocol')
                 try:
                     response = await exchange(message)
@@ -759,13 +759,24 @@ class Worker:
             if ready:
                 self.progress_ready.add(owner)
             return {'ok': True, 'published': True}
-        if message['type'] == 'club_xi':
-            if job['descriptor']['handler'] != 'get_club_lineups':
+        if message['type'] in ('club_xi_request', 'club_xi'):
+            descriptor = job['descriptor']
+            if descriptor['handler'] != 'get_club_lineups' or descriptor['args'].get('manual_only') is not True:
                 raise WorkerFailure('source_route_denied')
-            competition = job['descriptor']['context']['competition_id']
+            if message['type'] == 'club_xi_request':
+                request = await self.store.rpc('take_club_lineup', p_account=job['account_id'],
+                    p_key=job['resource_key'], p_owner=owner, p_generation=job['generation'])
+                job['_club_xi_request'] = request
+                return {'request': request}
+            request = job.pop('_club_xi_request', None)
+            fixture = message['fixture']
+            if not request or any(request.get(k) != fixture.get(k) for k in ('match_id','round_id','kickoff')):
+                raise WorkerFailure('source_route_denied')
             async with self.connections:
-                return await self.club_xi.check(competition, message['fixture'], message['players'],
-                                                message.get('clubs') or {})
+                if time.time() >= fixture['unix']:
+                    return {'status': 'outside_window'}
+                return await self.club_xi.check(descriptor['context']['competition_id'], fixture,
+                                                message['players'], message.get('clubs') or {})
         if message['type'] == 'clause_observation':
             if os.getenv('FUTMONDO_CLAUSE_SCHEDULING_ENABLED', 'false').lower() != 'true':
                 return {'ok': True}

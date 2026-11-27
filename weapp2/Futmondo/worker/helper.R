@@ -75,8 +75,6 @@ fm_worker_discover<-function(handler,value,context,auth,league_refresh=FALSE){
   for(fn in c('get_market_players','get_players_from_team','get_user_team_info','get_financial_snapshot',
               'get_my_market_players','get_roster_bids','get_user_team_rounds','get_user_team_moneymovements','fm_worker_finances'))add(fn,args,ctx)
   add('get_team_acquisition_capacity',args,ctx,300L)
-  if(club_xi_supported(ctx$competition_id,Sys.getenv('FUTMONDO_XI_COVERAGE'))=='ready')
-   add('get_club_lineups',list(championship_id=cid),ctx,300L)
   add('get_lineup_match_details',list(championship_id=cid),ctx,60L)
   add('get_championship_pressroom',list(championship_id=cid),ctx)
   for(route in c('/1/userteam/lineup','/1/userteam/roster','/1/userteam/information','/5/strategy/availables')){
@@ -355,6 +353,7 @@ fm_worker_run<-function(descriptor){
   if(is.null(saved$value)||!isTRUE(saved$discovery_only))return(NULL)
   fm_worker_decode(saved$value)
  }
+ env$fm_worker_club_xi_request <- function()fm_pipe_exchange(list(type='club_xi_request'))$request
  env$fm_worker_club_xi <- function(fixture,players,clubs)
   fm_pipe_exchange(list(type='club_xi',fixture=fixture,players=players,clubs=clubs))
  summary_views<-function(value,context){

@@ -287,6 +287,36 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(WorkerFailure,'resource_context'):
             await self.worker.exchange(self.job,'owner',dict(type='discovery_resource',descriptor=dict(d,context=dict(CONTEXT,account_id='foreign'))))
 
+    async def test_club_xi_requires_one_explicit_request_for_this_fixture(self):
+        d = descriptor('get_club_lineups', dict(championship_id='l', manual_only=True))
+        d['context'] = dict(CONTEXT,competition_id='504e4f584d8bec9a67000079')
+        job = dict(self.job,descriptor=d,resource_key=d['resource_key'])
+        fixture = dict(match_id='fixture',round_id='round',kickoff=stamp(time.time()+600),unix=time.time()+600)
+        request = {k:fixture[k] for k in ('match_id','round_id','kickoff')}
+        permits = [request,request,None]
+        rpc = self.store.rpc
+        async def respond(name,**params):
+            if name=='take_club_lineup':
+                return permits.pop(0)
+            return await rpc(name,**params)
+        self.store.rpc=respond
+        check=self.worker.club_xi.check=AsyncMock(return_value=dict(status='confirmed'))
+        read=dict(type='club_xi',fixture=fixture,players=[],clubs={})
+        async def exchange(message):
+            return await self.worker.exchange(job,'owner',message)
+        with self.assertRaisesRegex(WorkerFailure,'source_route_denied'):
+            await exchange(read)
+        await exchange(dict(type='club_xi_request'))
+        with self.assertRaisesRegex(WorkerFailure,'source_route_denied'):
+            await exchange(dict(read,fixture=dict(fixture,match_id='other')))
+        check.assert_not_awaited()
+        await exchange(dict(type='club_xi_request'))
+        self.assertEqual((await exchange(read))['status'],'confirmed')
+        await exchange(dict(type='club_xi_request'))
+        with self.assertRaisesRegex(WorkerFailure,'source_route_denied'):
+            await exchange(read)
+        check.assert_awaited_once()
+
     async def test_match_snapshot_replays_only_its_own_scoped_partial_data(self):
         match = descriptor('get_lineup_match_details')
         calendar = descriptor('get_finished_rounds')

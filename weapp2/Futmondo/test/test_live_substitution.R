@@ -119,6 +119,12 @@ if("--browser" %in% commandArgs(TRUE)){
     list(`_id`=m$id,st=m$status,h=list(id=m$homeTeam$id,name=m$homeTeam$id),
       a=list(id=m$awayTeam$id,name=m$awayTeam$id),info=list(date=m$date))))))
   # The two pitches consume the same verified, provider-independent player IDs.
+  xi_checks <- reactiveVal(0L)
+  club_xi_request <- function(s,fixture,owner){
+    stopifnot(identical(fixture$match_id,"fixture1"))
+    xi_checks(xi_checks()+1L)
+    promises::promise_resolve("requested")
+  }
   club_xi_source <- function(...)reactive({
     sheet <- lapply(seq_len(nrow(fixtures$rows)),function(i){
       m <- as.list(fixtures$rows[i,,drop=FALSE])
@@ -128,7 +134,9 @@ if("--browser" %in% commandArgs(TRUE)){
       m$players <- list(Forward="benched",Reserve="starting")
       m
     })
-    list(status="ready",matches=setNames(sheet,fixtures$rows$match_id))
+    sheet <- setNames(sheet,fixtures$rows$match_id)
+    if(!xi_checks())sheet$fixture1 <- NULL
+    list(status="ready",matches=sheet)
   })
   all_rounds <- rounds[rounds$round_id!="split",]
   all_rounds$begin_process <- stamp(clock+c(-3600,-86400,86400))
@@ -151,7 +159,7 @@ if("--browser" %in% commandArgs(TRUE)){
       reject(simpleError("synthetic timeout after acceptance"))
     },.35))
   }
-  ui <- fluidPage(tags$head(includeCSS("www/custom_style.css")),textOutput("counts"),
+  ui <- fluidPage(tags$head(includeCSS("www/custom_style.css")),textOutput("counts"),textOutput("xi_checks"),
     tabsetPanel(id="screen",tabPanel("Lineup",lineup_UI("lineup")),
       tabPanel("Classification",classification_UI("classification"))))
   server <- function(input,output,session){
@@ -160,6 +168,7 @@ if("--browser" %in% commandArgs(TRUE)){
       clause_transfers_source=reactive(list()))
     classification_Server("classification",reactive(identical(input$screen,"Classification")),login,league,team,
       reactive(data.frame(teamid="own",teamname="My team",points=12)),round_calendar=calendar)
+    output$xi_checks <- renderText(xi_checks())
     output$counts <- renderText({invalidateLater(100);paste(length(calls),writes,saves,reads)})
   }
   shiny::runApp(shinyApp(ui,server),host="127.0.0.1",port=as.integer(Sys.getenv("FUTMONDO_LIVE_TEST_PORT","8597")),launch.browser=FALSE)

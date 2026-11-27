@@ -267,6 +267,13 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
       button <- function(kind,label,...)live_sub_button(session$ns,event(kind,...),label)
       feed <- club_sheet()
       round_fixtures <- fixtures()
+      eligible_fixtures <- club_xi_checkable(feed,o$lineup$players,round_fixtures)
+      if(identical(feed$status,"ready")){
+        starts <- as.numeric(fm_time(round_fixtures$kickoff))-5400
+        remaining <- starts-as.numeric(Sys.time())
+        later_windows <- remaining[is.finite(remaining)&remaining>0]
+        if(length(later_windows))shiny::invalidateLater(min(86400000,ceiling(min(later_windows)*1000)),session)
+      }
       controls <- function(tile,i){
         player <- o$lineup$players[[i]]
         if(is.null(player))return(tile)
@@ -301,7 +308,14 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
           unsupported="StrikerAPI coverage is not configured for this competition.",
           calendar_pending="Waiting for the synced fixture calendar.",
           offline="Club XI checks require factual sync.",loading="Waiting for synced club team sheets.",
-          "Club team sheets · StrikerAPI · Checks begin 90 minutes before kickoff.")),
+          "Club team sheets · Check a fixture within 90 minutes of kickoff.")),
+        if(nrow(eligible_fixtures))shiny::div(class="fm-club-xi-checks",lapply(seq_len(nrow(eligible_fixtures)),function(i){
+          f <- eligible_fixtures[i,,drop=FALSE]
+          button("club_xi",paste0("Check club XI · ",f$home_name," vs ",f$away_name),fixture=f$match_id)
+        })),
+        if(identical(state$xi_note$key,s$key) &&
+           !isTRUE(feed$matches[[state$xi_note$fixture]]$checked>=state$xi_note$at))
+          shiny::div(role="status",state$xi_note$message),
         round_lineup_pitch_ui(data$answer,controls),chooser,
         if(identical(state$feedback$key,s$key))shiny::div(role="status",state$feedback$message),
         if(identical(pending$key,s$key)&&isTRUE(pending$uncertain))button("verify","Check official lineup"),
@@ -311,6 +325,29 @@ live_sub_server <- function(id,active,login,championship,team,round_ref,calendar
       e <- input$action;s <- scope()
       if(is.null(s)||!is.list(e)||!identical(e$key,s$key))return()
       state <- live_sub_round_state(root,s$key)
+      if(identical(e$kind,"club_xi")){
+        feed <- club_sheet()
+        rows <- club_xi_checkable(feed,options()$lineup$players,fixtures())
+        f <- rows[rows$match_id %in% e$fixture,,drop=FALSE]
+        if(nrow(f)!=1L || isTRUE(state$xi_submitting))return()
+        state$xi_submitting <- TRUE
+        at <- as.numeric(Sys.time())
+        update <- function(message)state$xi_note <- list(key=s$key,fixture=f$match_id,at=at,message=message)
+        update("Requesting this club XI…")
+        request <- tryCatch(club_xi_request(s,f,session$token),error=promises::promise_reject)
+        promises::then(request,function(status){
+          state$xi_submitting <- FALSE
+          update(switch(mvp_text(status),requested="Club XI check requested.",
+            busy="A check was requested recently. Allow a moment for the saved result.",
+            outside_window="This fixture is outside the pre-kickoff window.","Club XI check unavailable."))
+          NULL
+        },function(error){
+          state$xi_submitting <- FALSE
+          update("Could not verify the request. Check the saved result before requesting again.")
+          NULL
+        })
+        return()
+      }
       if(identical(e$kind,"persist")&&identical(state$save_failed$key,s$key)){
         persist(s,state$save_failed$data);return()
       }
