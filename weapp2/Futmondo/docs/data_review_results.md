@@ -1,5 +1,11 @@
 # Futmondo data review and implementation results
 
+## Round 14 scoring verification (2026-11-27)
+
+At 22:26 UTC the saved Round 14 ranking showed nine zeros. The Best XI snapshot showed Olasagasti on 14 in both `points` and `customPoints`. At 22:59 UTC the ranking showed 19, 17, 15, 13, 8, 8, 4, 0 and 0. Both MVP fields then held 17. The championship and Best XI response used the same custom selector and canonically identical scoring settings. Both worker jobs had a five-minute native interval and a 45-minute effective interval. The precise time of Futmondo’s revision between observations is unknown.
+
+A local Shiny replay with synthetic identifiers, the observed score fields and zero-valued team histories selected the running Round 14 ahead of the Round 15 lineup marker. The standings rendered the leader as `19 (9)` and the highlighted MVP row displayed 17. The live Classification and delayed-loading regression scripts passed. Production verification used read-only saved observations. The owner’s browser was not inspected. This documentation change has no runtime performance impact. [Source contracts and sync behavior](classification_module.md#in-progress-score-updates)
+
 ## Award player cards (2026-11-27)
 
 Chromium opened the standard card from Classification, both player leader charts, the sorted and searched winners table, the by-round MVP heading and the Best XI at 390 and 1440 px. The synthetic fixture covered keyboard input, repeat clicks, two players sharing a name, and a winner absent from the current catalog. Grouping by club exposed zero player controls. Eleven round-award checks passed, including stale league and close events, along with the Classification loading, Best XI crest and database-backed award display suites. The offline Shiny lifecycle passed 14 checks and eight tabs. Hosted behavior was not tested.

@@ -209,3 +209,9 @@ For an open round, Classification shows each team's confirmed point installments
 ## Dream team player cards (2026-11-27)
 
 Select a player name in the dream team to open the standard player card, including the highlighted MVP. The selected round’s saved rows supply the player ID. Closing the card leaves the selected round in place. [Shared award-card behavior](round_mvps_module.md#player-card-navigation-2026-11-27)
+
+## In-progress score updates
+
+The standings use the championship-specific team totals from `/1/ranking/round`. The Best XI uses the separate `/1/userteam/dreamteam` response for the same championship and round. In the official web client the ranking parser reads each team’s `points` and `live`. The Best XI parser reads the selection’s `pointSystem` and `custom` configuration and the player’s `points` and `customPoints`. Verified 2026-11-27 against the [official client bundle](https://app.futmondo.com/main.dart.js).
+
+The two observations have independent source timestamps. During a round, the official app can show revised scores between LigaRadar acquisitions. The configured worker interval applies to both jobs, and the browser picks up their database publications through its existing subscription. [Round 14 verification](data_review_results.md#round-14-scoring-verification-2026-11-27) · [Worker cadence](worker_cadence.md)

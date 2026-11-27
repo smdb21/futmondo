@@ -1,5 +1,9 @@
 # Futmondo data architecture redesign plan
 
+## Round 14 scoring verification (2026-11-27)
+
+Compared the two reported scores with successive database observations and the championship’s configured scoring system. The later publication reached the expected Classification projection. [Verification](data_review_results.md#round-14-scoring-verification-2026-11-27)
+
 ## Award player cards (2026-11-27)
 
 Classification and Round awards open the existing player card from individual award winners. Local implementation and offline browser verification are complete. [Navigation behavior](round_mvps_module.md#player-card-navigation-2026-11-27) · [Verification](data_review_results.md#award-player-cards-2026-11-27)
